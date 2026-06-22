@@ -1,0 +1,8 @@
+manifest_version = "0.1.0"
+
+[project]
+id = "college-election"
+name = "College Election Voting App"
+
+[workspace]
+include = ["src/frontend"]

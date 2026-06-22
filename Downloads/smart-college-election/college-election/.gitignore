@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Firebase local/runtime artifacts
+firebase-debug.log*
+firebase-export-metadata.json
+.runtimeconfig.json
+
+# Service accounts and credential dumps
+*service-account*.json
+*serviceaccount*.json
+*firebase-adminsdk*.json
+serviceAccount*.json
+
+# Local data / PII
+src/frontend/students.json
+
+# Logs and caches
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.cache/
+
+# Editors and OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Project-local backup/archive folders
+.old/
