@@ -1,0 +1,59 @@
+import { KioskPortal } from "@/components/KioskPortal";
+import { MobilePortal } from "@/components/MobilePortal";
+import { ResultsGuard } from "@/components/ResultsGuard";
+import {
+  Outlet,
+  RouterProvider,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from "@tanstack/react-router";
+
+function RootLayout() {
+  return <Outlet />;
+}
+
+const rootRoute = createRootRoute({ component: RootLayout });
+
+const mobileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/",
+  component: MobilePortal,
+});
+
+const kioskRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/kiosk",
+  component: KioskPortal,
+});
+
+const resultsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/results",
+  component: ResultsGuard,
+});
+
+const routeTree = rootRoute.addChildren([
+  mobileRoute,
+  kioskRoute,
+  resultsRoute,
+]);
+
+const router = createRouter({
+  routeTree,
+  defaultPreload: "intent",
+  defaultPreloadStaleTime: 0,
+  scrollRestoration: true,
+});
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}
+
+function App() {
+  return <RouterProvider router={router} />;
+}
+
+export default App;
