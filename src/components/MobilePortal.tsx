@@ -41,6 +41,10 @@ interface EligibleVoter {
   phoneNumber: string;
 }
 
+interface GrecaptchaLike {
+  reset: (widgetId?: number) => void;
+}
+
 function normalizeIndianPhoneNumber(value: string) {
   const digits = value.replace(/\D/g, "");
 
@@ -51,7 +55,19 @@ function normalizeIndianPhoneNumber(value: string) {
   return "";
 }
 
-function friendlyAuthError(error: unknown) {
+function isLocalDevelopmentHost(hostname: string) {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname.endsWith(".local") ||
+    /^10\./.test(hostname) ||
+    /^192\.168\./.test(hostname) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+  );
+}
+
+function friendlyAuthError(error: unknown, isLocalOrigin = false) {
   const code =
     typeof error === "object" && error && "code" in error
       ? String(error.code)
@@ -65,6 +81,19 @@ function friendlyAuthError(error: unknown) {
     return "That OTP has expired. Return to login and request a new one.";
   if (code.includes("too-many-requests"))
     return "Too many attempts. Please wait before trying again.";
+  if (code.includes("operation-not-allowed"))
+    return "Phone sign-in is not enabled in Firebase Authentication.";
+  if (code.includes("app-not-authorized") || code.includes("unauthorized-domain"))
+    return "This website domain is not authorized for Firebase phone sign-in. Add it in Firebase Authentication settings.";
+  if (
+    isLocalOrigin &&
+    (code.includes("captcha-check-failed") ||
+      code.includes("invalid-app-credential") ||
+      code.includes("missing-app-credential") ||
+      code.includes("network-request-failed"))
+  ) {
+    return "Firebase Phone Auth cannot send OTPs from this local address. Use a deployed HTTPS domain added to Firebase Authorized domains, or configure Firebase test phone numbers for development.";
+  }
   if (code.includes("captcha-check-failed"))
     return "Security verification failed. Please retry.";
 
@@ -85,31 +114,90 @@ export const MobilePortal = memo(function MobilePortal() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+  const recaptchaWidgetIdRef = useRef<number | null>(null);
   const isMountedRef = useRef(true);
+  const isLocalOrigin =
+    typeof window !== "undefined" &&
+    isLocalDevelopmentHost(window.location.hostname);
+  const shouldUseFirebaseTestAuth = import.meta.env.DEV && isLocalOrigin;
 
-  const resetRecaptcha = useCallback(() => {
+  const clearRecaptcha = useCallback(() => {
     recaptchaRef.current?.clear();
     recaptchaRef.current = null;
+    recaptchaWidgetIdRef.current = null;
   }, []);
+
+  const resetRecaptchaChallenge = useCallback(async () => {
+    if (!recaptchaRef.current) return;
+
+    const grecaptcha = (
+      window as typeof window & { grecaptcha?: GrecaptchaLike }
+    ).grecaptcha;
+
+    try {
+      if (recaptchaWidgetIdRef.current === null) {
+        recaptchaWidgetIdRef.current = await recaptchaRef.current.render();
+      }
+
+      if (grecaptcha && recaptchaWidgetIdRef.current !== null) {
+        grecaptcha.reset(recaptchaWidgetIdRef.current);
+        return;
+      }
+    } catch {
+      // Fall through to a full verifier reset.
+    }
+
+    clearRecaptcha();
+  }, [clearRecaptcha]);
 
   useEffect(() => {
     isMountedRef.current = true;
 
     return () => {
       isMountedRef.current = false;
-      resetRecaptcha();
+      clearRecaptcha();
     };
-  }, [resetRecaptcha]);
+  }, [clearRecaptcha]);
 
-  const getRecaptcha = useCallback(() => {
+  useEffect(() => {
+    auth.settings.appVerificationDisabledForTesting =
+      shouldUseFirebaseTestAuth;
+
+    return () => {
+      auth.settings.appVerificationDisabledForTesting = false;
+    };
+  }, [shouldUseFirebaseTestAuth]);
+
+  const getRecaptcha = useCallback(async () => {
     if (!recaptchaRef.current) {
       recaptchaRef.current = new RecaptchaVerifier(auth, "mobile-recaptcha", {
         size: "invisible",
+        "expired-callback": () => {
+          if (isMountedRef.current) {
+            setError("Security verification expired. Please tap Send OTP again.");
+          }
+        },
       });
+    }
+
+    if (recaptchaWidgetIdRef.current === null) {
+      recaptchaWidgetIdRef.current = await recaptchaRef.current.render();
     }
 
     return recaptchaRef.current;
   }, []);
+
+  useEffect(() => {
+    if (viewState === "home" || viewState === "voting") return;
+
+    void getRecaptcha().catch((recaptchaError) => {
+      console.error("reCAPTCHA setup failed:", recaptchaError);
+
+      if (isMountedRef.current) {
+        setError(friendlyAuthError(recaptchaError, isLocalOrigin));
+      }
+    });
+  }, [getRecaptcha, isLocalOrigin, viewState]);
 
   const enterPortal = useCallback(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -177,7 +265,7 @@ export const MobilePortal = memo(function MobilePortal() {
       const result = await signInWithPhoneNumber(
         auth,
         normalizedPhone,
-        getRecaptcha(),
+        await getRecaptcha(),
       );
 
       if (!isMountedRef.current) return;
@@ -191,9 +279,9 @@ export const MobilePortal = memo(function MobilePortal() {
       setViewState("otp");
     } catch (sendError) {
       console.error("OTP send failed:", sendError);
-      resetRecaptcha();
+      await resetRecaptchaChallenge();
       if (isMountedRef.current) {
-        setError(friendlyAuthError(sendError));
+        setError(friendlyAuthError(sendError, isLocalOrigin));
       }
     } finally {
       if (isMountedRef.current) {
@@ -213,12 +301,12 @@ export const MobilePortal = memo(function MobilePortal() {
     try {
       await confirmation.confirm(otp);
       if (!isMountedRef.current) return;
-      resetRecaptcha();
+      clearRecaptcha();
       setViewState("voting");
     } catch (verificationError) {
       console.error("OTP verification failed:", verificationError);
       if (isMountedRef.current) {
-        setError(friendlyAuthError(verificationError));
+        setError(friendlyAuthError(verificationError, isLocalOrigin));
       }
     } finally {
       if (isMountedRef.current) {
@@ -228,16 +316,16 @@ export const MobilePortal = memo(function MobilePortal() {
   };
 
   const returnToLogin = useCallback(() => {
-    resetRecaptcha();
+    clearRecaptcha();
     setViewState("login");
     setOtp("");
     setConfirmation(null);
     setEligibleVoter(null);
     setError("");
-  }, [resetRecaptcha]);
+  }, [clearRecaptcha]);
 
   const resetToHome = useCallback(() => {
-    resetRecaptcha();
+    clearRecaptcha();
     void signOut(auth).catch((signOutError) => {
       console.error("Auth sign-out failed:", signOutError);
     });
@@ -250,7 +338,7 @@ export const MobilePortal = memo(function MobilePortal() {
     setIsLoading(false);
     window.scrollTo({ top: 0, behavior: "auto" });
     setViewState("home");
-  }, [resetRecaptcha]);
+  }, [clearRecaptcha]);
 
   if (viewState === "home") {
     return <HomePage onStartVoting={enterPortal} />;
@@ -294,6 +382,12 @@ export const MobilePortal = memo(function MobilePortal() {
               ? `We sent a 6-digit code to ${eligibleVoter?.phoneNumber ?? phoneNumber}.`
               : "Enter the Student ID and phone number registered with the college."}
           </p>
+          {shouldUseFirebaseTestAuth && (
+            <p className="mt-3 max-w-sm rounded-2xl border border-emerald-400/15 bg-emerald-500/10 px-3 py-2 text-xs leading-5 text-emerald-200/90">
+              Local test mode is active. Use a Firebase Authentication test
+              phone number and its matching OTP from the Firebase console.
+            </p>
+          )}
         </div>
 
         <div id="mobile-recaptcha" className="max-w-full overflow-hidden" />

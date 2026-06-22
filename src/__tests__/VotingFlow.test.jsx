@@ -11,6 +11,14 @@ const docMock = vi.fn((...segments) => ({ path: segments.join("/") }));
 const signInWithPhoneNumberMock = vi.fn();
 const signOutMock = vi.fn().mockResolvedValue(undefined);
 const recaptchaClearMock = vi.fn();
+const recaptchaRenderMock = vi.fn().mockResolvedValue(1);
+const { authMock } = vi.hoisted(() => ({
+  authMock: {
+    settings: {
+      appVerificationDisabledForTesting: false,
+    },
+  },
+}));
 
 vi.mock("firebase/firestore", () => ({
   doc: (...args) => docMock(...args),
@@ -19,15 +27,18 @@ vi.mock("firebase/firestore", () => ({
 }));
 
 vi.mock("firebase/auth", () => ({
-  RecaptchaVerifier: vi.fn().mockImplementation(() => ({
-    clear: recaptchaClearMock,
-  })),
+  RecaptchaVerifier: vi.fn(function MockRecaptchaVerifier() {
+    return {
+      clear: recaptchaClearMock,
+      render: recaptchaRenderMock,
+    };
+  }),
   signInWithPhoneNumber: (...args) => signInWithPhoneNumberMock(...args),
   signOut: (...args) => signOutMock(...args),
 }));
 
 vi.mock("../../firebase.js", () => ({
-  auth: {},
+  auth: authMock,
   db: {},
 }));
 
@@ -70,10 +81,19 @@ async function openMobileLogin() {
   const user = userEvent.setup();
   render(<MobilePortal />);
   await user.click(screen.getByRole("button", { name: /enter portal/i }));
+  await waitFor(() => {
+    expect(recaptchaRenderMock).toHaveBeenCalled();
+  });
   return user;
 }
 
 describe("Voting flow guards", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    recaptchaRenderMock.mockResolvedValue(1);
+    authMock.settings.appVerificationDisabledForTesting = false;
+  });
+
   it("blocks login when the student ID does not exist in Firestore", async () => {
     getDocMock.mockResolvedValueOnce(
       createSnapshot({ exists: false, data: undefined }),
@@ -114,6 +134,41 @@ describe("Voting flow guards", () => {
     expect(signInWithPhoneNumberMock).not.toHaveBeenCalled();
     expect(
       screen.getByRole("heading", { name: /verify your identity/i }),
+    ).toBeTruthy();
+  });
+
+  it("enables Firebase test-phone mode on local development hosts", async () => {
+    await openMobileLogin();
+
+    expect(authMock.settings.appVerificationDisabledForTesting).toBe(true);
+    expect(
+      screen.getByText(/local test mode is active/i),
+    ).toBeTruthy();
+  });
+
+  it("shows a precise Firebase phone auth message for local development failures", async () => {
+    getDocMock.mockResolvedValueOnce(
+      createSnapshot({
+        exists: true,
+        data: {
+          student_id: "22CS110",
+          phone_number: "+916842624110",
+          has_voted: false,
+        },
+      }),
+    );
+    signInWithPhoneNumberMock.mockRejectedValueOnce({
+      code: "auth/invalid-app-credential",
+    });
+
+    const user = await openMobileLogin();
+
+    await user.type(screen.getByLabelText(/student id/i), "22CS110");
+    await user.type(screen.getByLabelText(/phone number/i), "6842624110");
+    await user.click(screen.getByRole("button", { name: /send otp/i }));
+
+    expect(
+      await screen.findByText(/cannot send OTPs from this local address/i),
     ).toBeTruthy();
   });
 

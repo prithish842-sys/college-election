@@ -76,6 +76,16 @@ npm run build
 
 The app currently uses the Firebase web SDK configuration from `firebase.js`. That client-side config is typically safe to ship for a web app, but you should still lock down your Firebase Authentication and Firestore rules before deployment.
 
+### Local OTP testing
+
+For `localhost` and other local development hosts, the mobile portal now enables Firebase's test-phone mode automatically. That means:
+
+- use phone numbers added under Firebase Authentication test phone numbers
+- use the matching test OTP configured in Firebase
+- do not expect real SMS delivery from local development origins
+
+For production-like testing, deploy to an authorized HTTPS domain in Firebase Authentication.
+
 Do not commit:
 
 - service account JSON files
