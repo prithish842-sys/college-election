@@ -1,0 +1,177 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@layer utilities {
+  .team-border-1 {
+    border-left: 3px solid oklch(0.72 0.22 41);
+  }
+  .team-border-2 {
+    border-left: 3px solid oklch(0.68 0.2 270);
+  }
+  .team-border-3 {
+    border-left: 3px solid oklch(0.65 0.18 185);
+  }
+  .team-border-4 {
+    border-left: 3px solid oklch(0.78 0.18 30);
+  }
+  .team-border-5 {
+    border-left: 3px solid oklch(0.7 0.2 300);
+  }
+  .team-border-6 {
+    border-left: 3px solid oklch(0.65 0.16 160);
+  }
+  .team-icon-1 {
+    background-color: oklch(0.72 0.22 41 / 0.15);
+    color: oklch(0.72 0.22 41);
+  }
+  .team-icon-2 {
+    background-color: oklch(0.68 0.2 270 / 0.15);
+    color: oklch(0.68 0.2 270);
+  }
+  .team-icon-3 {
+    background-color: oklch(0.65 0.18 185 / 0.15);
+    color: oklch(0.65 0.18 185);
+  }
+  .team-icon-4 {
+    background-color: oklch(0.78 0.18 30 / 0.15);
+    color: oklch(0.78 0.18 30);
+  }
+  .team-icon-5 {
+    background-color: oklch(0.7 0.2 300 / 0.15);
+    color: oklch(0.7 0.2 300);
+  }
+  .team-icon-6 {
+    background-color: oklch(0.65 0.16 160 / 0.15);
+    color: oklch(0.65 0.16 160);
+  }
+  .transition-smooth {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .shadow-subtle {
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  }
+}
+@font-face {
+  font-family: "General Sans";
+  src: url("/assets/fonts/GeneralSans.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/assets/fonts/GeistMono.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DM Sans";
+  src: url("/assets/fonts/DMSans.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/assets/fonts/SpaceGrotesk.woff2") format("woff2");
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+    --background: 0.08 0.001 0;
+    --foreground: 0.95 0.002 0;
+    --card: 0.12 0.002 270;
+    --card-foreground: 0.95 0.002 0;
+    --popover: 0.15 0.003 270;
+    --popover-foreground: 0.95 0.002 0;
+    --primary: 0.52 0.18 270;
+    --primary-foreground: 0.95 0.002 0;
+    --secondary: 0.25 0.015 270;
+    --secondary-foreground: 0.92 0.005 0;
+    --muted: 0.22 0.01 270;
+    --muted-foreground: 0.65 0.005 0;
+    --accent: 0.88 0.018 0;
+    --accent-foreground: 0.08 0.001 0;
+    --destructive: 0.577 0.245 27.325;
+    --destructive-foreground: 0.95 0.002 0;
+    --border: 0.2 0.005 270;
+    --input: 0.2 0.01 270;
+    --ring: 0.52 0.18 270;
+    --chart-1: 0.646 0.222 41.116;
+    --chart-2: 0.6 0.118 184.704;
+    --chart-3: 0.398 0.07 227.392;
+    --chart-4: 0.828 0.189 84.429;
+    --chart-5: 0.769 0.188 70.08;
+    --sidebar: 0.985 0 0;
+    --sidebar-foreground: 0.145 0 0;
+    --sidebar-primary: 0.55 0.22 270;
+    --sidebar-primary-foreground: 0.985 0 0;
+    --sidebar-accent: 0.96 0.01 270;
+    --sidebar-accent-foreground: 0.145 0 0;
+    --sidebar-border: 0.9 0.01 270;
+    --sidebar-ring: 0.55 0.22 270;
+
+    --font-display: "General Sans", sans-serif;
+    --font-body: "General Sans", sans-serif;
+    --font-mono: "Geist Mono", monospace;
+  }
+
+  .dark {
+    --background: 0.08 0.001 0;
+    --foreground: 0.95 0.002 0;
+    --card: 0.12 0.002 270;
+    --card-foreground: 0.95 0.002 0;
+    --popover: 0.15 0.003 270;
+    --popover-foreground: 0.95 0.002 0;
+    --primary: 0.52 0.18 270;
+    --primary-foreground: 0.95 0.002 0;
+    --secondary: 0.25 0.015 270;
+    --secondary-foreground: 0.92 0.005 0;
+    --muted: 0.22 0.01 270;
+    --muted-foreground: 0.65 0.005 0;
+    --accent: 0.88 0.018 0;
+    --accent-foreground: 0.08 0.001 0;
+    --destructive: 0.577 0.245 27.325;
+    --destructive-foreground: 0.95 0.002 0;
+    --border: 0.2 0.005 270;
+    --input: 0.2 0.01 270;
+    --ring: 0.52 0.18 270;
+    --chart-1: 0.646 0.222 41.116;
+    --chart-2: 0.6 0.118 184.704;
+    --chart-3: 0.769 0.188 70.08;
+    --chart-4: 0.627 0.265 303.9;
+    --chart-5: 0.645 0.246 16.439;
+    --sidebar: 0.1 0.001 0;
+    --sidebar-foreground: 0.95 0.002 0;
+    --sidebar-primary: 0.52 0.18 270;
+    --sidebar-primary-foreground: 0.95 0.002 0;
+    --sidebar-accent: 0.88 0.018 0;
+    --sidebar-accent-foreground: 0.08 0.001 0;
+    --sidebar-border: 0.18 0.005 270;
+    --sidebar-ring: 0.52 0.18 270;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-[#040814] text-foreground antialiased;
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
+  }
+  html {
+    color-scheme: dark;
+    background: #040814;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+}
+
+@theme {
+  --radius: 0.75rem;
+  --font-display: Space Grotesk, sans-serif;
+  --font-body: DM Sans, sans-serif;
+  --font-mono: Geist Mono, monospace;
+}

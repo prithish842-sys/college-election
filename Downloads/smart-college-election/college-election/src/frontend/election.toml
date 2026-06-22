@@ -1,0 +1,15 @@
+manifest_version = "0.1.0"
+
+[project]
+name = "frontend"
+type = "assets"
+
+[build]
+commands = ["npm run build"]
+out = "dist"
+
+[check]
+commands = ["npm run typecheck", "npm run check"]
+
+[check.fix]
+commands = ["npm run typecheck", "npm run fix"]
