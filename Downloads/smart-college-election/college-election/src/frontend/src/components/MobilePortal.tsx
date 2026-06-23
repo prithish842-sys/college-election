@@ -41,27 +41,34 @@ interface EligibleVoter {
   phoneNumber: string;
 }
 
-declare global {
-  interface Window {
-    recaptchaVerifier?: RecaptchaVerifier | null;
-  }
-}
+const E164_PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
+const RECAPTCHA_CONTAINER_ID = "sign-in-button";
 
 function normalizeIndianPhoneNumber(value: string) {
   const digits = value.replace(/\D/g, "");
+  let candidate = "";
 
-  if (digits.length === 10) return `+91${digits}`;
-  if (digits.length === 12 && digits.startsWith("91")) return `+${digits}`;
-  if (value.trim().startsWith("+") && digits.length >= 11) return `+${digits}`;
+  if (digits.length === 10) candidate = `+91${digits}`;
+  else if (digits.length === 12 && digits.startsWith("91"))
+    candidate = `+${digits}`;
+  else if (value.trim().startsWith("+")) candidate = `+${digits}`;
 
-  return "";
+  return E164_PHONE_PATTERN.test(candidate) ? candidate : "";
+}
+
+function getAuthErrorDetails(error: unknown) {
+  if (typeof error !== "object" || !error) {
+    return { code: "unknown", message: String(error) };
+  }
+
+  return {
+    code: "code" in error ? String(error.code) : "unknown",
+    message: "message" in error ? String(error.message) : "Unknown error",
+  };
 }
 
 function friendlyAuthError(error: unknown) {
-  const code =
-    typeof error === "object" && error && "code" in error
-      ? String(error.code)
-      : "";
+  const { code } = getAuthErrorDetails(error);
 
   if (code.includes("invalid-phone-number"))
     return "Enter a valid phone number.";
@@ -104,15 +111,22 @@ export const MobilePortal = memo(function MobilePortal() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const isMountedRef = useRef(true);
-  const shouldUseFirebaseTestAuth =
-    import.meta.env.DEV &&
-    import.meta.env.VITE_FIREBASE_DISABLE_APP_VERIFICATION === "true";
+  const isOtpRequestInFlightRef = useRef(false);
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
   const clearRecaptcha = useCallback(() => {
+    const verifier = recaptchaVerifierRef.current;
+    recaptchaVerifierRef.current = null;
+
+    if (!verifier) return;
+
     try {
-      window.recaptchaVerifier?.clear();
-    } finally {
-      window.recaptchaVerifier = null;
+      verifier.clear();
+    } catch (clearError) {
+      console.error("[Firebase Auth] Failed to clear reCAPTCHA verifier", {
+        ...getAuthErrorDetails(clearError),
+        phase: "recaptcha-cleanup",
+      });
     }
   }, []);
 
@@ -121,43 +135,48 @@ export const MobilePortal = memo(function MobilePortal() {
 
     return () => {
       isMountedRef.current = false;
+      isOtpRequestInFlightRef.current = false;
       clearRecaptcha();
     };
   }, [clearRecaptcha]);
 
-  useEffect(() => {
-    if (!shouldUseFirebaseTestAuth) return;
-
-    auth.settings.appVerificationDisabledForTesting = true;
-
-    return () => {
-      auth.settings.appVerificationDisabledForTesting = false;
-    };
-  }, []);
-
-  const getRecaptcha = useCallback(() => {
-    if (!window.recaptchaVerifier) {
-      window.recaptchaVerifier = new RecaptchaVerifier(
-        auth,
-        "sign-in-button",
-        {
-          size: "invisible",
-          callback: () => {
-            // signInWithPhoneNumber continues after reCAPTCHA is solved.
-          },
-          "expired-callback": () => {
-            if (isMountedRef.current) {
-              setError(
-                "Security verification expired. Please tap Send OTP again.",
-              );
-            }
-            clearRecaptcha();
-          },
-        },
-      );
+  const getRecaptcha = useCallback(async () => {
+    if (recaptchaVerifierRef.current) {
+      return recaptchaVerifierRef.current;
     }
 
-    return window.recaptchaVerifier;
+    const container = document.getElementById(RECAPTCHA_CONTAINER_ID);
+    if (!container) {
+      const containerError = new Error(
+        "The reCAPTCHA container is not mounted.",
+      ) as Error & { code: string };
+      containerError.code = "auth/recaptcha-container-missing";
+      throw containerError;
+    }
+
+    container.replaceChildren();
+
+    const verifier = new RecaptchaVerifier(auth, RECAPTCHA_CONTAINER_ID, {
+      size: "invisible",
+      callback: () => {
+        // signInWithPhoneNumber resumes after reCAPTCHA is solved.
+      },
+      "expired-callback": () => {
+        if (isMountedRef.current) {
+          setError("Security verification expired. Please tap Send OTP again.");
+        }
+        clearRecaptcha();
+      },
+    });
+    recaptchaVerifierRef.current = verifier;
+
+    try {
+      await verifier.render();
+      return verifier;
+    } catch (renderError) {
+      clearRecaptcha();
+      throw renderError;
+    }
   }, [clearRecaptcha]);
 
   const enterPortal = useCallback(() => {
@@ -167,7 +186,7 @@ export const MobilePortal = memo(function MobilePortal() {
 
   const sendOtp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (isLoading) return;
+    if (isOtpRequestInFlightRef.current) return;
 
     const normalizedStudentId = studentId.trim();
     const normalizedPhone = normalizeIndianPhoneNumber(phoneNumber);
@@ -178,10 +197,13 @@ export const MobilePortal = memo(function MobilePortal() {
     }
 
     if (!normalizedPhone) {
-      setError("Enter a valid 10-digit phone number.");
+      setError(
+        "Enter a valid phone number in E.164 format (for example, +919876543210).",
+      );
       return;
     }
 
+    isOtpRequestInFlightRef.current = true;
     setIsLoading(true);
     setError("");
 
@@ -223,14 +245,16 @@ export const MobilePortal = memo(function MobilePortal() {
         return;
       }
 
+      const recaptchaVerifier = await getRecaptcha();
       const result = await signInWithPhoneNumber(
         auth,
         normalizedPhone,
-        getRecaptcha(),
+        recaptchaVerifier,
       );
 
       if (!isMountedRef.current) return;
 
+      clearRecaptcha();
       setEligibleVoter({
         studentId: normalizedStudentId,
         phoneNumber: normalizedPhone,
@@ -239,18 +263,20 @@ export const MobilePortal = memo(function MobilePortal() {
       setPhoneNumber(normalizedPhone);
       setViewState("otp");
     } catch (sendError) {
-      console.error("OTP send failed:", sendError);
+      console.error("[Firebase Auth] OTP send failed", {
+        ...getAuthErrorDetails(sendError),
+        phase: "send-otp",
+        projectId: auth.app?.options.projectId,
+        authDomain: auth.app?.options.authDomain,
+      });
       // Failed verifier instances cannot always be reused. A fresh verifier is
       // created on the next Send OTP attempt without requiring a page reload.
-      try {
-        window.recaptchaVerifier?.clear();
-      } finally {
-        window.recaptchaVerifier = null;
-      }
+      clearRecaptcha();
       if (isMountedRef.current) {
         setError(friendlyAuthError(sendError));
       }
     } finally {
+      isOtpRequestInFlightRef.current = false;
       if (isMountedRef.current) {
         setIsLoading(false);
       }
@@ -271,7 +297,12 @@ export const MobilePortal = memo(function MobilePortal() {
       clearRecaptcha();
       setViewState("voting");
     } catch (verificationError) {
-      console.error("OTP verification failed:", verificationError);
+      console.error("[Firebase Auth] OTP verification failed", {
+        ...getAuthErrorDetails(verificationError),
+        phase: "verify-otp",
+        projectId: auth.app?.options.projectId,
+        authDomain: auth.app?.options.authDomain,
+      });
       if (isMountedRef.current) {
         setError(friendlyAuthError(verificationError));
       }
@@ -349,12 +380,6 @@ export const MobilePortal = memo(function MobilePortal() {
               ? `We sent a 6-digit code to ${eligibleVoter?.phoneNumber ?? phoneNumber}.`
               : "Enter the Student ID and phone number registered with the college."}
           </p>
-          {shouldUseFirebaseTestAuth && (
-            <p className="mt-3 max-w-sm rounded-2xl border border-emerald-400/15 bg-emerald-500/10 px-3 py-2 text-xs leading-5 text-emerald-200/90">
-              Local test mode is active. Use a Firebase Authentication test
-              phone number and its matching OTP from the Firebase console.
-            </p>
-          )}
         </div>
 
         {isOtpView ? (
@@ -431,8 +456,8 @@ export const MobilePortal = memo(function MobilePortal() {
               }}
             />
             <PortalError error={error} />
+            <div id={RECAPTCHA_CONTAINER_ID} />
             <SubmitButton
-              id="sign-in-button"
               isLoading={isLoading}
               disabled={!studentId.trim() || !phoneNumber.trim()}
               loadingText="Sending OTP..."

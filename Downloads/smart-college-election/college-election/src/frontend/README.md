@@ -137,7 +137,6 @@ src/
   __tests__/
 public/
 firebase.js
-seed-firestore.js
 vite.config.js
 ```
 

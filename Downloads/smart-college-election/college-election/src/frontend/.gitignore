@@ -13,6 +13,7 @@ coverage/
 .env.*
 !.env.example
 !.env.sample
+.vercel/
 
 # firebase local artifacts
 firebase-debug.log*
@@ -41,3 +42,5 @@ pnpm-debug.log*
 Thumbs.db
 .idea/
 .vscode/
+.vercel
+.env*
