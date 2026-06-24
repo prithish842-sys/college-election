@@ -42,6 +42,15 @@ function isWriteContentionError(error: unknown) {
   );
 }
 
+function isNetworkRelatedError(error: unknown) {
+  const code = getFirestoreErrorCode(error);
+  return (
+    code.includes("unavailable") ||
+    code.includes("deadline-exceeded") ||
+    code.includes("network-request-failed")
+  );
+}
+
 function queueKioskBallot(votes: Vote) {
   const hasEveryVote = POSITIONS.every((position) => {
     const candidateId = votes[position.id];
@@ -224,7 +233,9 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
               error: writeError,
             };
 
-            if (isWriteContentionError(writeError)) {
+            if (isNetworkRelatedError(writeError)) {
+              console.warn("Offline caching active", failureDetails);
+            } else if (isWriteContentionError(writeError)) {
               console.warn(
                 "[Firestore] Kiosk ballot synchronization failed",
                 failureDetails,
@@ -244,8 +255,15 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
       await submitBallot(studentId, votes);
       setView("success");
     } catch (writeError) {
-      submissionStartedRef.current = false;
       const code = getFirestoreErrorCode(writeError);
+
+      if (isNetworkRelatedError(writeError)) {
+        console.warn("Offline caching active", { code, error: writeError });
+        setView("success");
+        return;
+      }
+
+      submissionStartedRef.current = false;
 
       if (isWriteContentionError(writeError)) {
         console.warn("[Firestore] Ballot write contention detected", {

@@ -1,21 +1,19 @@
 import { memo, useCallback, useState } from "react";
-import { HomePage } from "./HomePage";
 import { SharedVotingUI } from "./SharedVotingUI";
 
-type KioskViewState = "home" | "voting";
-
 export const KioskPortal = memo(function KioskPortal() {
-  const [viewState, setViewState] = useState<KioskViewState>("home");
+  const [sessionKey, setSessionKey] = useState(0);
 
-  const enterPortal = useCallback(() => setViewState("voting"), []);
-  const resetToHome = useCallback(() => {
+  const startNextSession = useCallback(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
-    setViewState("home");
+    setSessionKey((currentKey) => currentKey + 1);
   }, []);
 
-  if (viewState === "home") {
-    return <HomePage onStartVoting={enterPortal} />;
-  }
-
-  return <SharedVotingUI mode="kiosk" onSessionComplete={resetToHome} />;
+  return (
+    <SharedVotingUI
+      key={sessionKey}
+      mode="kiosk"
+      onSessionComplete={startNextSession}
+    />
+  );
 });

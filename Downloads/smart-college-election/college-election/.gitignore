@@ -44,3 +44,5 @@ Thumbs.db
 
 # Project-local backup/archive folders
 .old/
+.vercel
+.env*
