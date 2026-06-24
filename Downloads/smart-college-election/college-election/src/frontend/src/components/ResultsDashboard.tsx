@@ -59,25 +59,35 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(
-      collection(db, "ballots"),
-      (snapshot) => {
-        setBallots(
-          snapshot.docs
-            .map(
-              (ballotDocument) => (ballotDocument.data() as BallotRecord).votes,
-            )
-            .filter((votes): votes is Vote => Boolean(votes)),
-        );
-        setLoadError("");
-      },
-      (error) => {
-        console.error("Results subscription failed:", error);
-        setLoadError("Live results are temporarily unavailable.");
-      },
-    );
+    let unsubscribe: () => void = () => undefined;
 
-    return unsubscribe;
+    try {
+      unsubscribe = onSnapshot(
+        collection(db, "ballots"),
+        (snapshot) => {
+          setBallots(
+            snapshot.docs
+              .map(
+                (ballotDocument) =>
+                  (ballotDocument.data() as BallotRecord).votes,
+              )
+              .filter((votes): votes is Vote => Boolean(votes)),
+          );
+          setLoadError("");
+        },
+        (error) => {
+          console.error("Results subscription failed:", error);
+          setLoadError("Live results are temporarily unavailable.");
+        },
+      );
+    } catch (error) {
+      console.error("Results subscription setup failed:", error);
+      setLoadError("Live results are temporarily unavailable.");
+    }
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const candidateTotals = useMemo(() => {

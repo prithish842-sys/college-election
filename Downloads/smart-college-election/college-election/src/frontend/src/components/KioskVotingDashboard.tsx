@@ -2,6 +2,7 @@ import { CANDIDATES, POSITIONS } from "@/data/electionData";
 import { submitBallot } from "@/lib/voting";
 import type { Vote } from "@/types/election";
 import {
+  type DocumentReference,
   collection,
   doc,
   increment,
@@ -27,6 +28,19 @@ type DashboardView = "voting" | "confirmation" | "success";
 
 const BALLOTS_COLLECTION = "ballots";
 const CANDIDATE_TOTALS_COLLECTION = "candidate_totals";
+
+function getFirestoreErrorCode(error: unknown) {
+  return typeof error === "object" && error && "code" in error
+    ? String(error.code).toLowerCase()
+    : "unknown";
+}
+
+function isWriteContentionError(error: unknown) {
+  const code = getFirestoreErrorCode(error);
+  return (
+    code.includes("deadline-exceeded") || code.includes("failed-precondition")
+  );
+}
 
 function queueKioskBallot(votes: Vote) {
   const hasEveryVote = POSITIONS.every((position) => {
@@ -87,7 +101,9 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
   const [votes, setVotes] = useState<Vote>({});
   const [view, setView] = useState<DashboardView>("voting");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const ballotSyncListenersRef = useRef(new Set<() => void>());
+  const [queuedKioskBallot, setQueuedKioskBallot] =
+    useState<DocumentReference | null>(null);
+  const submissionStartedRef = useRef(false);
   const nextUnvotedIndex = POSITIONS.findIndex(
     (position) => !votes[position.id],
   );
@@ -148,55 +164,52 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
     };
   }, [isSidebarOpen]);
 
-  useEffect(
-    () => () => {
-      for (const unsubscribe of ballotSyncListenersRef.current) unsubscribe();
-      ballotSyncListenersRef.current.clear();
-    },
-    [],
-  );
+  useEffect(() => {
+    if (!queuedKioskBallot) return;
+
+    try {
+      return onSnapshot(
+        queuedKioskBallot,
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (!snapshot.exists()) return;
+
+          // Metadata-only observation avoids React state updates and render
+          // thrashing while still exposing pending/synchronized status.
+          console.info("[Firestore] Kiosk ballot sync status", {
+            ballotId: snapshot.id,
+            pending: snapshot.metadata.hasPendingWrites,
+            fromCache: snapshot.metadata.fromCache,
+          });
+        },
+        (snapshotError) => {
+          console.error("[Firestore] Kiosk ballot listener failed", {
+            ballotId: queuedKioskBallot.id,
+            code: snapshotError.code,
+            error: snapshotError,
+          });
+        },
+      );
+    } catch (listenerError) {
+      console.error("[Firestore] Unable to observe kiosk ballot sync status", {
+        ballotId: queuedKioskBallot.id,
+        error: listenerError,
+      });
+    }
+  }, [queuedKioskBallot]);
 
   const handleSubmit = useCallback(async () => {
-    if (mode === "kiosk") {
-      try {
+    if (submissionStartedRef.current) return;
+    submissionStartedRef.current = true;
+
+    try {
+      if (mode === "kiosk") {
         const { ballotReference, commitPromise } = queueKioskBallot(votes);
 
         // The atomic batch is now in Firestore's local mutation queue. Its
         // promise intentionally remains pending while the device is offline.
+        setQueuedKioskBallot(ballotReference);
         setView("success");
-
-        try {
-          const unsubscribe = onSnapshot(
-            ballotReference,
-            { includeMetadataChanges: true },
-            (snapshot) => {
-              if (!snapshot.exists()) return;
-
-              console.info("[Firestore] Kiosk ballot sync status", {
-                ballotId: snapshot.id,
-                pending: snapshot.metadata.hasPendingWrites,
-                fromCache: snapshot.metadata.fromCache,
-              });
-            },
-            (snapshotError) => {
-              console.error("[Firestore] Kiosk ballot listener failed", {
-                ballotId: ballotReference.id,
-                code: snapshotError.code,
-                error: snapshotError,
-              });
-            },
-          );
-
-          ballotSyncListenersRef.current.add(unsubscribe);
-        } catch (listenerError) {
-          console.error(
-            "[Firestore] Unable to observe kiosk ballot sync status",
-            {
-              ballotId: ballotReference.id,
-              error: listenerError,
-            },
-          );
-        }
 
         void commitPromise
           .then(() => {
@@ -205,28 +218,52 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
             });
           })
           .catch((writeError) => {
-            console.error("[Firestore] Kiosk ballot synchronization failed", {
+            const failureDetails = {
               ballotId: ballotReference.id,
-              code:
-                typeof writeError === "object" &&
-                writeError &&
-                "code" in writeError
-                  ? String(writeError.code)
-                  : "unknown",
+              code: getFirestoreErrorCode(writeError),
               error: writeError,
-            });
+            };
+
+            if (isWriteContentionError(writeError)) {
+              console.warn(
+                "[Firestore] Kiosk ballot synchronization failed",
+                failureDetails,
+              );
+            } else {
+              console.error(
+                "[Firestore] Kiosk ballot synchronization failed",
+                failureDetails,
+              );
+            }
           });
         return;
-      } catch (writeError) {
-        console.error("[Firestore] Unable to queue kiosk ballot", writeError);
-        throw writeError;
       }
-    } else {
+
       if (!studentId)
         throw new Error("The verified voter session has expired.");
       await submitBallot(studentId, votes);
+      setView("success");
+    } catch (writeError) {
+      submissionStartedRef.current = false;
+      const code = getFirestoreErrorCode(writeError);
+
+      if (isWriteContentionError(writeError)) {
+        console.warn("[Firestore] Ballot write contention detected", {
+          code,
+          error: writeError,
+        });
+        throw new Error(
+          "The voting service is temporarily busy. Please submit your ballot again.",
+          { cause: writeError },
+        );
+      }
+
+      console.error("[Firestore] Unable to submit ballot", {
+        code,
+        error: writeError,
+      });
+      throw writeError;
     }
-    setView("success");
   }, [mode, studentId, votes]);
 
   if (view === "success") {

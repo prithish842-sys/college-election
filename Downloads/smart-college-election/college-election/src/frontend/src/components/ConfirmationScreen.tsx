@@ -1,7 +1,7 @@
 import type { Candidate, Position, Vote } from "@/types/election";
 import { AlertCircle, CheckCircle2, LoaderCircle } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 interface ConfirmationScreenProps {
   votes: Vote;
@@ -18,12 +18,17 @@ export function ConfirmationScreen({
 }: ConfirmationScreenProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const submissionLockedRef = useRef(false);
 
   const findCandidate = (positionId: string): Candidate | undefined =>
     candidates.find((c) => c.id === votes[positionId]);
 
   const handleConfirm = async () => {
-    if (isSubmitting) return;
+    if (submissionLockedRef.current || isSubmitting) return;
+
+    // Ref assignment is synchronous, unlike React state batching, and closes
+    // the same-tick double-tap window before the button rerenders as disabled.
+    submissionLockedRef.current = true;
     setIsSubmitting(true);
     setError("");
 
@@ -31,6 +36,7 @@ export function ConfirmationScreen({
       await onConfirm();
     } catch (submissionError) {
       console.error("Ballot submission failed:", submissionError);
+      submissionLockedRef.current = false;
       setError(
         submissionError instanceof Error
           ? submissionError.message
