@@ -50,56 +50,59 @@ export const MobilePortal = memo(function MobilePortal() {
     setViewState("login");
   }, []);
 
-  const verifyStudentId = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (verificationInFlightRef.current) return;
+  const verifyStudentId = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (verificationInFlightRef.current) return;
 
-    const normalizedStudentId = studentId.trim().toUpperCase();
+      const normalizedStudentId = studentId.trim().toUpperCase();
 
-    if (!normalizedStudentId) {
-      setError("Enter your Student ID.");
-      return;
-    }
-
-    verificationInFlightRef.current = true;
-    setIsLoading(true);
-    setError("");
-
-    try {
-      const voterSnapshot = await getStudentSnapshot(normalizedStudentId);
-
-      if (!voterSnapshot.exists()) {
-        setError("Invalid Student ID.");
+      if (!normalizedStudentId) {
+        setError("Enter your Student ID.");
         return;
       }
 
-      const voter = voterSnapshot.data() as VoterRecord;
+      verificationInFlightRef.current = true;
+      setIsLoading(true);
+      setError("");
 
-      if (voter.has_voted === true) {
-        setError("You have already voted.");
-        return;
+      try {
+        const voterSnapshot = await getStudentSnapshot(normalizedStudentId);
+
+        if (!voterSnapshot?.exists?.()) {
+          setError("Invalid Student ID.");
+          return;
+        }
+
+        const voter = voterSnapshot?.data?.() as VoterRecord | undefined;
+
+        if (voter?.has_voted === true) {
+          setError("You have already voted.");
+          return;
+        }
+
+        if (voter?.has_voted !== false) {
+          setError(
+            "Voting eligibility could not be verified. Contact an administrator.",
+          );
+          return;
+        }
+
+        setVerifiedStudentId(normalizedStudentId);
+        setViewState("voting");
+      } catch (verificationError) {
+        console.error("[Firestore] Student ID verification failed", {
+          error: verificationError,
+          studentId: normalizedStudentId,
+        });
+        setError("Unable to verify your Student ID. Please try again.");
+      } finally {
+        verificationInFlightRef.current = false;
+        setIsLoading(false);
       }
-
-      if (voter.has_voted !== false) {
-        setError(
-          "Voting eligibility could not be verified. Contact an administrator.",
-        );
-        return;
-      }
-
-      setVerifiedStudentId(normalizedStudentId);
-      setViewState("voting");
-    } catch (verificationError) {
-      console.error("[Firestore] Student ID verification failed", {
-        error: verificationError,
-        studentId: normalizedStudentId,
-      });
-      setError("Unable to verify your Student ID. Please try again.");
-    } finally {
-      verificationInFlightRef.current = false;
-      setIsLoading(false);
-    }
-  };
+    },
+    [studentId],
+  );
 
   const resetToHome = useCallback(() => {
     setStudentId("");

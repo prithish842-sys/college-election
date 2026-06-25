@@ -18,22 +18,30 @@ export const VotingView = memo(function VotingView({
   votes,
   onVote,
 }: VotingViewProps) {
-  const currentPosition = positions[currentPositionIndex];
+  const currentPosition = positions?.[currentPositionIndex] ?? positions?.[0];
+  const currentPositionId = currentPosition?.id ?? "";
   const positionCandidates = useMemo(
     () =>
-      candidates.filter(
-        (candidate) => candidate.positionId === currentPosition.id,
-      ),
-    [candidates, currentPosition.id],
+      currentPositionId
+        ? candidates.filter(
+            (candidate) => candidate?.positionId === currentPositionId,
+          )
+        : [],
+    [candidates, currentPositionId],
   );
-  const selectedId = votes[currentPosition.id];
+  const selectedId = currentPositionId ? votes?.[currentPositionId] : undefined;
 
   const handleVote = useCallback(
     (candidateId: string) => {
-      onVote(currentPosition.id, candidateId);
+      if (!currentPositionId) return;
+      onVote(currentPositionId, candidateId);
     },
-    [currentPosition.id, onVote],
+    [currentPositionId, onVote],
   );
+
+  if (!currentPosition) {
+    return null;
+  }
 
   return (
     <div

@@ -38,7 +38,7 @@ export const VoteSuccessScreen = memo(function VoteSuccessScreen({
           Ballot recorded
         </p>
         <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-          Thank You for Voting
+          Vote Submitted Successfully
         </h1>
         <p className="mx-auto mt-4 max-w-sm text-sm leading-6 text-white/55 sm:text-base">
           Your selections have been securely submitted. This voting session is

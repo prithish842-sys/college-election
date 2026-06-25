@@ -1,5 +1,6 @@
 import type { Position, Vote } from "@/types/election";
 import { Check, X } from "lucide-react";
+import { memo, useMemo } from "react";
 import { LogoMark } from "./LogoMark";
 
 interface SidebarMenuProps {
@@ -13,7 +14,7 @@ interface SidebarMenuProps {
   onPositionSelect: (id: string) => void;
 }
 
-export function SidebarMenu({
+export const SidebarMenu = memo(function SidebarMenu({
   positions,
   votes,
   currentPositionId,
@@ -23,6 +24,8 @@ export function SidebarMenu({
   onClose,
   onPositionSelect,
 }: SidebarMenuProps) {
+  const votedCount = useMemo(() => Object.keys(votes).length, [votes]);
+
   return (
     <>
       {/* Backdrop */}
@@ -92,7 +95,7 @@ export function SidebarMenu({
                 Election Positions
               </p>
               <p className="text-muted-foreground text-xs mt-0.5">
-                {Object.keys(votes).length} of {positions.length} voted
+                {votedCount} of {positions.length} voted
               </p>
             </div>
           </div>
@@ -174,4 +177,4 @@ export function SidebarMenu({
       </div>
     </>
   );
-}
+});

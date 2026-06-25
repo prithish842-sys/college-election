@@ -41,7 +41,7 @@ export const POSITIONS: Position[] = [
     title: "Cultural Head",
     description:
       "Leads cultural festivals, arts programs, and celebrations that enrich campus life and student creativity.",
-    icon: " ­",
+    icon: "",
   },
   {
     id: "technical-lead",

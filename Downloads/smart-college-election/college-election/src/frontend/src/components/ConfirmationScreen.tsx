@@ -1,7 +1,7 @@
 import type { Candidate, Position, Vote } from "@/types/election";
 import { AlertCircle, CheckCircle2, LoaderCircle } from "lucide-react";
 import { motion } from "motion/react";
-import { useRef, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 
 interface ConfirmationScreenProps {
   votes: Vote;
@@ -10,7 +10,7 @@ interface ConfirmationScreenProps {
   onConfirm: () => Promise<void>;
 }
 
-export function ConfirmationScreen({
+export const ConfirmationScreen = memo(function ConfirmationScreen({
   votes,
   positions,
   candidates,
@@ -20,10 +20,20 @@ export function ConfirmationScreen({
   const [error, setError] = useState("");
   const submissionLockedRef = useRef(false);
 
-  const findCandidate = (positionId: string): Candidate | undefined =>
-    candidates.find((c) => c.id === votes[positionId]);
+  const votedCandidatesByPosition = useMemo(() => {
+    const candidateById = new Map(
+      candidates.map((candidate) => [candidate?.id, candidate]),
+    );
 
-  const handleConfirm = async () => {
+    return new Map(
+      positions.map((position) => [
+        position.id,
+        candidateById.get(votes?.[position.id]),
+      ]),
+    );
+  }, [candidates, positions, votes]);
+
+  const handleConfirm = useCallback(async () => {
     if (submissionLockedRef.current || isSubmitting) return;
 
     // Ref assignment is synchronous, unlike React state batching, and closes
@@ -44,7 +54,7 @@ export function ConfirmationScreen({
       );
       setIsSubmitting(false);
     }
-  };
+  }, [isSubmitting, onConfirm]);
 
   return (
     <div
@@ -148,7 +158,7 @@ export function ConfirmationScreen({
                 WebkitTextFillColor: "transparent",
               }}
             >
-              Your Vote Has Been Cast!
+              Your vote has been cast
             </h1>
             <p className="text-muted-foreground text-sm">
               All {positions.length} positions have been recorded.
@@ -164,7 +174,7 @@ export function ConfirmationScreen({
             style={{ border: "1px solid rgba(37,99,235,0.2)" }}
           >
             {positions.map((position, index) => {
-              const voted = findCandidate(position.id);
+              const voted = votedCandidatesByPosition.get(position.id);
               return (
                 <div
                   key={position.id}
@@ -202,7 +212,7 @@ export function ConfirmationScreen({
                       fontFamily: "Space Grotesk, sans-serif",
                     }}
                   >
-                    {voted ? voted.name : "— Not voted"}
+                    {voted?.name ?? "Not voted"}
                   </span>
                   {voted && (
                     <CheckCircle2
@@ -247,11 +257,11 @@ export function ConfirmationScreen({
               {isSubmitting && (
                 <LoaderCircle className="h-4 w-4 animate-spin" />
               )}
-              {isSubmitting ? "SUBMITTING..." : "SUBMIT VOTE"}
+              {isSubmitting ? "Submitting..." : "Submit vote"}
             </button>
           </div>
         </div>
       </motion.div>
     </div>
   );
-}
+});

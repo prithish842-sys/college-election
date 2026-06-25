@@ -18,7 +18,7 @@ export function ResultsGuard() {
       return;
     }
 
-    setError("Access denied — incorrect passcode.");
+    setError("Access denied - incorrect passcode.");
   };
 
   if (isAuthorized) return <ResultsDashboard />;

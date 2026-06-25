@@ -13,13 +13,20 @@ export const CandidateCard = memo(function CandidateCard({
   isSelected,
   onSelect,
 }: CandidateCardProps) {
+  const candidateId = candidate?.id ?? "";
+  const candidateName = candidate?.name ?? "Candidate";
+  const candidateDescription = candidate?.description ?? "";
+  const candidateImageUrl = candidate?.imageUrl ?? "/logo.png";
+
   return (
     <button
       type="button"
       data-ocid="candidate.card"
-      onClick={() => onSelect(candidate.id)}
+      onClick={() => {
+        if (candidateId) onSelect(candidateId);
+      }}
       aria-pressed={isSelected}
-      aria-label={`${isSelected ? "Selected: " : "Select "}${candidate.name}`}
+      aria-label={`${isSelected ? "Selected: " : "Select "}${candidateName}`}
       className="relative flex flex-col items-center text-center p-5 rounded-2xl cursor-pointer outline-none w-full"
       style={{
         background: isSelected
@@ -85,7 +92,7 @@ export const CandidateCard = memo(function CandidateCard({
         }}
       >
         <img
-          src={candidate.imageUrl}
+          src={candidateImageUrl}
           alt=""
           width={74}
           height={74}
@@ -106,7 +113,7 @@ export const CandidateCard = memo(function CandidateCard({
           letterSpacing: "-0.01em",
         }}
       >
-        {candidate.name}
+        {candidateName}
       </h3>
 
       {/* Description */}
@@ -114,8 +121,8 @@ export const CandidateCard = memo(function CandidateCard({
         className="text-muted-foreground text-xs leading-relaxed mb-4 flex-1"
         style={{ lineHeight: 1.6 }}
       >
-        {candidate.description.slice(0, 90)}
-        {candidate.description.length > 90 ? "\u2026" : ""}
+        {candidateDescription.slice(0, 90)}
+        {candidateDescription.length > 90 ? "..." : ""}
       </p>
 
       {/* Select indicator */}
@@ -136,7 +143,7 @@ export const CandidateCard = memo(function CandidateCard({
           letterSpacing: "0.12em",
         }}
       >
-        {isSelected ? "✓ VOTED" : "VOTE"}
+        {isSelected ? "Voted" : "Vote"}
       </div>
     </button>
   );

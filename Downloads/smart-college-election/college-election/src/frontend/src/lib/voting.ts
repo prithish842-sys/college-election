@@ -84,7 +84,13 @@ function getFirestoreErrorCode(error: unknown) {
     : "unknown";
 }
 
+function isBrowserOffline() {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
+
 function isNetworkRelatedError(error: unknown) {
+  if (isBrowserOffline()) return true;
+
   const code = getFirestoreErrorCode(error);
   return (
     code.includes("unavailable") ||
@@ -112,7 +118,22 @@ export async function submitBallot(studentId: string, votes: Vote) {
   });
   applyCandidateVoteIncrementsToBatch(batch, votes);
 
-  const commitPromise = batch.commit();
+  let commitPromise: Promise<void>;
+
+  try {
+    commitPromise = batch.commit();
+  } catch (writeError) {
+    if (isNetworkRelatedError(writeError)) {
+      console.warn("Offline caching active", {
+        ballotId: ballotReference.id,
+        code: getFirestoreErrorCode(writeError),
+        error: writeError,
+      });
+      return;
+    }
+
+    throw writeError;
+  }
 
   void commitPromise
     .then(() => {

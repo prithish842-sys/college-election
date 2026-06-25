@@ -11,7 +11,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { Menu } from "lucide-react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { db } from "../../firebase.js";
 import { ConfirmationScreen } from "./ConfirmationScreen";
 import { SidebarMenu } from "./SidebarMenu";
@@ -28,6 +28,9 @@ type DashboardView = "voting" | "confirmation" | "success";
 
 const BALLOTS_COLLECTION = "ballots";
 const CANDIDATE_TOTALS_COLLECTION = "candidate_totals";
+const MOBILE_BALLOT_POSITIONS = POSITIONS.filter((position) =>
+  CANDIDATES.some((candidate) => candidate.positionId === position.id),
+);
 
 function getFirestoreErrorCode(error: unknown) {
   return typeof error === "object" && error && "code" in error
@@ -49,6 +52,14 @@ function isNetworkRelatedError(error: unknown) {
     code.includes("deadline-exceeded") ||
     code.includes("network-request-failed")
   );
+}
+
+function isBrowserOffline() {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
+
+function shouldTreatAsQueuedWrite(error: unknown, writeStarted = true) {
+  return isNetworkRelatedError(error) || (writeStarted && isBrowserOffline());
 }
 
 function queueKioskBallot(votes: Vote) {
@@ -113,32 +124,51 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
   const [queuedKioskBallot, setQueuedKioskBallot] =
     useState<DocumentReference | null>(null);
   const submissionStartedRef = useRef(false);
-  const nextUnvotedIndex = POSITIONS.findIndex(
-    (position) => !votes[position.id],
+  const ballotPositions =
+    mode === "mobile" ? MOBILE_BALLOT_POSITIONS : POSITIONS;
+  const nextUnvotedIndex = useMemo(
+    () => ballotPositions.findIndex((position) => !votes[position.id]),
+    [ballotPositions, votes],
   );
-  const currentPosition = POSITIONS[currentPositionIndex] ?? POSITIONS[0];
+  const currentPosition = useMemo(
+    () => ballotPositions[currentPositionIndex] ?? ballotPositions[0],
+    [ballotPositions, currentPositionIndex],
+  );
 
-  const handleVote = useCallback((positionId: string, candidateId: string) => {
-    setVotes((currentVotes) => {
-      const nextVotes = { ...currentVotes, [positionId]: candidateId };
-      const firstUnvotedIndex = POSITIONS.findIndex(
-        (position) => !nextVotes[position.id],
-      );
-
-      if (firstUnvotedIndex === -1) {
-        setView("confirmation");
-      } else {
-        setCurrentPositionIndex(firstUnvotedIndex);
-        setView("voting");
-      }
-
-      return nextVotes;
-    });
+  const closeSidebar = useCallback(() => {
+    setIsSidebarOpen(false);
   }, []);
+
+  const openSidebar = useCallback(() => {
+    setIsSidebarOpen(true);
+  }, []);
+
+  const noop = useCallback(() => undefined, []);
+
+  const handleVote = useCallback(
+    (positionId: string, candidateId: string) => {
+      setVotes((currentVotes) => {
+        const nextVotes = { ...currentVotes, [positionId]: candidateId };
+        const firstUnvotedIndex = ballotPositions.findIndex(
+          (position) => !nextVotes[position.id],
+        );
+
+        if (firstUnvotedIndex === -1) {
+          setView("confirmation");
+        } else {
+          setCurrentPositionIndex(firstUnvotedIndex);
+          setView("voting");
+        }
+
+        return nextVotes;
+      });
+    },
+    [ballotPositions],
+  );
 
   const handlePositionSelect = useCallback(
     (positionId: string) => {
-      const selectedIndex = POSITIONS.findIndex(
+      const selectedIndex = ballotPositions.findIndex(
         (position) => position.id === positionId,
       );
 
@@ -153,7 +183,7 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
       setView("voting");
       setIsSidebarOpen(false);
     },
-    [nextUnvotedIndex],
+    [ballotPositions, nextUnvotedIndex],
   );
 
   useEffect(() => {
@@ -181,14 +211,14 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
         queuedKioskBallot,
         { includeMetadataChanges: true },
         (snapshot) => {
-          if (!snapshot.exists()) return;
+          if (!snapshot?.exists?.()) return;
 
           // Metadata-only observation avoids React state updates and render
           // thrashing while still exposing pending/synchronized status.
           console.info("[Firestore] Kiosk ballot sync status", {
             ballotId: snapshot.id,
-            pending: snapshot.metadata.hasPendingWrites,
-            fromCache: snapshot.metadata.fromCache,
+            pending: snapshot.metadata?.hasPendingWrites,
+            fromCache: snapshot.metadata?.fromCache,
           });
         },
         (snapshotError) => {
@@ -210,10 +240,12 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
   const handleSubmit = useCallback(async () => {
     if (submissionStartedRef.current) return;
     submissionStartedRef.current = true;
+    let writeStarted = false;
 
     try {
       if (mode === "kiosk") {
         const { ballotReference, commitPromise } = queueKioskBallot(votes);
+        writeStarted = true;
 
         // The atomic batch is now in Firestore's local mutation queue. Its
         // promise intentionally remains pending while the device is offline.
@@ -233,7 +265,7 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
               error: writeError,
             };
 
-            if (isNetworkRelatedError(writeError)) {
+            if (shouldTreatAsQueuedWrite(writeError)) {
               console.warn("Offline caching active", failureDetails);
             } else if (isWriteContentionError(writeError)) {
               console.warn(
@@ -257,7 +289,7 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
     } catch (writeError) {
       const code = getFirestoreErrorCode(writeError);
 
-      if (isNetworkRelatedError(writeError)) {
+      if (shouldTreatAsQueuedWrite(writeError, writeStarted)) {
         console.warn("Offline caching active", { code, error: writeError });
         setView("success");
         return;
@@ -292,7 +324,7 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
     <div className="min-h-screen bg-[#040814] text-white">
       <button
         type="button"
-        onClick={() => setIsSidebarOpen(true)}
+        onClick={openSidebar}
         aria-label="Open election positions"
         aria-expanded={isSidebarOpen}
         className="fixed left-3 top-3 z-[90] flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-[#0a0e1a]/90 text-blue-200 shadow-lg shadow-black/30 backdrop-blur-xl transition hover:bg-[#111a30] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 md:hidden"
@@ -302,25 +334,25 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
 
       <div className="md:hidden">
         <SidebarMenu
-          positions={POSITIONS}
+          positions={ballotPositions}
           votes={votes}
-          currentPositionId={currentPosition.id}
+          currentPositionId={currentPosition?.id ?? ""}
           nextUnvotedIndex={nextUnvotedIndex}
           isOpen={isSidebarOpen}
-          onClose={() => setIsSidebarOpen(false)}
+          onClose={closeSidebar}
           onPositionSelect={handlePositionSelect}
         />
       </div>
 
       <div className="hidden md:block">
         <SidebarMenu
-          positions={POSITIONS}
+          positions={ballotPositions}
           votes={votes}
-          currentPositionId={currentPosition.id}
+          currentPositionId={currentPosition?.id ?? ""}
           nextUnvotedIndex={nextUnvotedIndex}
           isOpen
           persistent
-          onClose={() => undefined}
+          onClose={noop}
           onPositionSelect={handlePositionSelect}
         />
       </div>
@@ -334,7 +366,7 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
       <div className="min-h-screen md:pl-80">
         {view === "voting" && (
           <VotingView
-            positions={POSITIONS}
+            positions={ballotPositions}
             candidates={CANDIDATES}
             currentPositionIndex={currentPositionIndex}
             votes={votes}
@@ -345,7 +377,7 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
         {view === "confirmation" && (
           <ConfirmationScreen
             votes={votes}
-            positions={POSITIONS}
+            positions={ballotPositions}
             candidates={CANDIDATES}
             onConfirm={handleSubmit}
           />

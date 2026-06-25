@@ -3,7 +3,7 @@ import type { Vote } from "@/types/election";
 import { Link } from "@tanstack/react-router";
 import { collection, onSnapshot } from "firebase/firestore";
 import { ArrowLeft, BarChart3 } from "lucide-react";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { db } from "../../firebase.js";
 
 interface BallotRecord {
@@ -53,6 +53,42 @@ function parseCandidateDetails(description: string): CandidateDetails {
   };
 }
 
+const positionCandidatesById = new Map(
+  POSITIONS.map((position) => [
+    position.id,
+    CANDIDATES.filter((candidate) => candidate.positionId === position.id),
+  ]),
+);
+
+const candidateDetailsById = new Map(
+  CANDIDATES.map((candidate) => [
+    candidate.id,
+    parseCandidateDetails(candidate.description),
+  ]),
+);
+
+function getPositionCandidates(positionId: string) {
+  return positionCandidatesById.get(positionId) ?? [];
+}
+
+function getCandidateDetails(candidateId: string) {
+  return candidateDetailsById.get(candidateId) ?? defaultCandidateDetails;
+}
+
+function getVoteSignature(vote: Vote | undefined) {
+  return POSITIONS.map((position) => vote?.[position.id] ?? "").join("|");
+}
+
+function areBallotsEqual(currentBallots: Vote[], nextBallots: Vote[]) {
+  return (
+    currentBallots.length === nextBallots.length &&
+    currentBallots.every(
+      (ballot, index) =>
+        getVoteSignature(ballot) === getVoteSignature(nextBallots[index]),
+    )
+  );
+}
+
 export const ResultsDashboard = memo(function ResultsDashboard() {
   const [ballots, setBallots] = useState<Vote[]>([]);
   const [selectedPositionId, setSelectedPositionId] = useState(POSITIONS[0].id);
@@ -65,13 +101,20 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
       unsubscribe = onSnapshot(
         collection(db, "ballots"),
         (snapshot) => {
-          setBallots(
-            snapshot.docs
-              .map(
-                (ballotDocument) =>
-                  (ballotDocument.data() as BallotRecord).votes,
-              )
-              .filter((votes): votes is Vote => Boolean(votes)),
+          const nextBallots =
+            snapshot?.docs
+              ?.map((ballotDocument) => {
+                const ballot = ballotDocument.data?.() as
+                  | BallotRecord
+                  | undefined;
+                return ballot?.votes;
+              })
+              .filter((votes): votes is Vote => Boolean(votes)) ?? [];
+
+          setBallots((currentBallots) =>
+            areBallotsEqual(currentBallots, nextBallots)
+              ? currentBallots
+              : nextBallots,
           );
           setLoadError("");
         },
@@ -102,13 +145,18 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
     return totals;
   }, [ballots]);
 
-  const selectedPosition =
-    POSITIONS.find((position) => position.id === selectedPositionId) ??
-    POSITIONS[0];
+  const selectedPosition = useMemo(
+    () =>
+      POSITIONS.find((position) => position.id === selectedPositionId) ??
+      POSITIONS[0],
+    [selectedPositionId],
+  );
+  const selectPosition = useCallback((positionId: string) => {
+    setSelectedPositionId(positionId);
+  }, []);
+
   const standingCandidates = useMemo(() => {
-    const positionCandidates = CANDIDATES.filter(
-      (candidate) => candidate.positionId === selectedPosition.id,
-    );
+    const positionCandidates = getPositionCandidates(selectedPosition.id);
     const votesInPosition = positionCandidates.reduce(
       (total, candidate) => total + (candidateTotals.get(candidate.id) ?? 0),
       0,
@@ -123,7 +171,7 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
       const votes = candidateTotals.get(candidate.id) ?? 0;
       const percentage =
         votesInPosition > 0 ? (votes / votesInPosition) * 100 : 0;
-      const details = parseCandidateDetails(candidate.description);
+      const details = getCandidateDetails(candidate.id);
 
       return {
         id: candidate.id,
@@ -162,9 +210,7 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
   const positionSnapshots = useMemo(
     () =>
       POSITIONS.map((position) => {
-        const positionCandidates = CANDIDATES.filter(
-          (candidate) => candidate.positionId === position.id,
-        );
+        const positionCandidates = getPositionCandidates(position.id);
         const highestVotes = positionCandidates.reduce(
           (currentHighest, candidate) =>
             Math.max(currentHighest, candidateTotals.get(candidate.id) ?? 0),
@@ -172,7 +218,7 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
         );
         const leaders = positionCandidates
           .map((candidate) => {
-            const details = parseCandidateDetails(candidate.description);
+            const details = getCandidateDetails(candidate.id);
 
             return {
               id: candidate.id,
@@ -217,10 +263,10 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
             </div>
             <div className="pt-0.5">
               <span className="inline-flex rounded-full border border-white/10 bg-white/[0.05] px-4 py-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.24em] text-slate-300">
-                Admin results
+                Admin Results
               </span>
               <h1 className="mt-4 font-display text-4xl font-bold tracking-tight text-slate-50 sm:text-5xl">
-                Election ballots
+                Election Ballots
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400 sm:text-[0.95rem]">
                 Review every submitted ballot and track live candidate standings
@@ -263,7 +309,7 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
                 <button
                   key={position.id}
                   type="button"
-                  onClick={() => setSelectedPositionId(position.id)}
+                  onClick={() => selectPosition(position.id)}
                   className={`rounded-full border px-3 py-1.5 text-xs transition sm:text-sm ${
                     selectedPositionId === position.id
                       ? "border-white/20 bg-white/10 text-white"
@@ -304,7 +350,7 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
               <button
                 key={position.positionId}
                 type="button"
-                onClick={() => setSelectedPositionId(position.positionId)}
+                onClick={() => selectPosition(position.positionId)}
                 className={`rounded-[1.8rem] border p-5 text-left shadow-lg shadow-black/10 transition ${
                   selectedPositionId === position.positionId
                     ? "border-white/20 bg-white/[0.07]"
@@ -349,7 +395,7 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
               </div>
               <div className="min-w-36 rounded-[1.4rem] border border-white/10 bg-white/[0.04] px-4 py-3 text-right">
                 <p className="text-[0.64rem] uppercase tracking-[0.2em] text-slate-400">
-                  Votes in position
+                  Votes in this position
                 </p>
                 <p className="mt-1 font-display text-2xl font-semibold">
                   {votesInPosition}
