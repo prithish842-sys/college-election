@@ -24,6 +24,10 @@ const defaultCandidateDetails: CandidateDetails = {
 
 const leadingBadgeClassName =
   "inline-flex shrink-0 items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[0.65rem] font-bold tracking-[0.08em] text-emerald-400";
+const dashboardToggleTrackClassName =
+  "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-white/15 p-1 shadow-inner transition-all duration-300 ease-in-out";
+const dashboardToggleThumbClassName =
+  "h-5 w-5 rounded-full bg-white shadow-sm transition-all duration-300 ease-in-out";
 
 function parseCandidateDetails(description: string): CandidateDetails {
   const normalizedDescription = description.trim().replace(/\s+/g, " ");
@@ -92,6 +96,7 @@ function areBallotsEqual(currentBallots: Vote[], nextBallots: Vote[]) {
 export const ResultsDashboard = memo(function ResultsDashboard() {
   const [ballots, setBallots] = useState<Vote[]>([]);
   const [selectedPositionId, setSelectedPositionId] = useState(POSITIONS[0].id);
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
@@ -238,11 +243,6 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
           positionId: position.id,
           positionTitle: position.title,
           highestVotes,
-          totalVotes: positionCandidates.reduce(
-            (total, candidate) =>
-              total + (candidateTotals.get(candidate.id) ?? 0),
-            0,
-          ),
           leaders,
         };
       }),
@@ -250,7 +250,11 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
   );
 
   return (
-    <main className="min-h-screen bg-[#0b1120] text-white">
+    <main
+      className={`min-h-screen text-white transition-colors duration-300 ease-in-out ${
+        isDarkTheme ? "bg-[#0b1120]" : "bg-[#0f2f5f]"
+      }`}
+    >
       <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-9 lg:px-8 lg:py-12">
         <header className="flex flex-col gap-7 border-b border-white/10 pb-8 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex items-start gap-4 sm:gap-5">
@@ -275,16 +279,42 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
             </div>
           </div>
 
-          <Link
-            to="/"
-            className="inline-flex min-h-12 items-center justify-center gap-2 self-start rounded-xl border border-white/10 bg-white/[0.04] px-5 text-sm text-slate-200 transition hover:bg-white/[0.08] lg:self-auto"
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Back to voting
-          </Link>
+          <div className="flex flex-col gap-3 self-start sm:flex-row sm:items-center lg:self-auto">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isDarkTheme}
+              aria-label="Toggle dashboard background theme"
+              onClick={() => setIsDarkTheme((currentTheme) => !currentTheme)}
+              className="inline-flex min-h-12 items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm text-slate-200 shadow-lg shadow-black/10 transition-all duration-300 ease-in-out hover:bg-white/[0.08] hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0047AB] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b1120]"
+            >
+              <span className="font-medium">
+                {isDarkTheme ? "Dark theme" : "Blue theme"}
+              </span>
+              <span
+                className={`${dashboardToggleTrackClassName} ${
+                  isDarkTheme ? "bg-[#0047AB]" : "bg-white/10"
+                }`}
+              >
+                <span
+                  className={`${dashboardToggleThumbClassName} ${
+                    isDarkTheme ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </span>
+            </button>
+
+            <Link
+              to="/"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 text-sm text-slate-200 transition hover:bg-white/[0.08]"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              Back to voting
+            </Link>
+          </div>
         </header>
 
-        <section className="grid gap-4 py-8 lg:grid-cols-[19rem_1fr]">
+        <section className="grid gap-4 py-8 sm:grid-cols-2 xl:grid-cols-4">
           <article className="rounded-[1.8rem] border border-white/10 bg-white/[0.045] p-5 shadow-xl shadow-black/10 backdrop-blur-xl">
             <p className="text-[0.68rem] font-medium uppercase tracking-[0.2em] text-slate-400">
               Total ballots
@@ -297,28 +327,6 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
                 className="h-5 w-5 text-slate-500"
                 aria-hidden="true"
               />
-            </div>
-          </article>
-
-          <article className="rounded-[1.8rem] border border-white/10 bg-white/[0.045] p-5 shadow-xl shadow-black/10 backdrop-blur-xl">
-            <p className="mb-3 text-[0.68rem] font-medium uppercase tracking-[0.2em] text-slate-400">
-              Positions tracked
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {POSITIONS.map((position) => (
-                <button
-                  key={position.id}
-                  type="button"
-                  onClick={() => selectPosition(position.id)}
-                  className={`rounded-full border px-3 py-1.5 text-xs transition sm:text-sm ${
-                    selectedPositionId === position.id
-                      ? "border-white/20 bg-white/10 text-white"
-                      : "border-white/10 bg-white/[0.035] text-slate-400 hover:bg-white/[0.07] hover:text-slate-200"
-                  }`}
-                >
-                  {position.title}
-                </button>
-              ))}
             </div>
           </article>
         </section>
@@ -357,13 +365,10 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
                     : "border-white/10 bg-white/[0.04] hover:bg-white/[0.06]"
                 }`}
               >
-                <div className="flex items-start justify-between gap-3">
+                <div>
                   <p className="text-sm font-semibold text-slate-100">
                     {position.positionTitle}
                   </p>
-                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[0.65rem] uppercase tracking-[0.18em] text-slate-400">
-                    {position.totalVotes} votes
-                  </span>
                 </div>
                 <p className="mt-5 text-sm text-slate-400">Top choice</p>
                 <p className="mt-1 text-base text-slate-50">

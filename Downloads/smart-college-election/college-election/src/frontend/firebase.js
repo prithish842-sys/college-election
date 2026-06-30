@@ -8,23 +8,26 @@ import {
   persistentMultipleTabManager,
 } from "firebase/firestore";
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+function readRequiredEnv(name) {
+  const value = import.meta.env?.[name];
+  return typeof value === "string" ? value.trim() : "";
+}
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  apiKey: readRequiredEnv("VITE_FIREBASE_API_KEY"),
+  authDomain: readRequiredEnv("VITE_FIREBASE_AUTH_DOMAIN"),
+  projectId: readRequiredEnv("VITE_FIREBASE_PROJECT_ID"),
+  storageBucket: readRequiredEnv("VITE_FIREBASE_STORAGE_BUCKET"),
+  messagingSenderId: readRequiredEnv("VITE_FIREBASE_MESSAGING_SENDER_ID"),
+  appId: readRequiredEnv("VITE_FIREBASE_APP_ID"),
+  measurementId: readRequiredEnv("VITE_FIREBASE_MEASUREMENT_ID"),
 };
 
 const requiredFirebaseConfig = {
-  apiKey: firebaseConfig.apiKey,
-  authDomain: firebaseConfig.authDomain,
-  projectId: firebaseConfig.projectId,
-  appId: firebaseConfig.appId,
+  VITE_FIREBASE_API_KEY: firebaseConfig.apiKey,
+  VITE_FIREBASE_AUTH_DOMAIN: firebaseConfig.authDomain,
+  VITE_FIREBASE_PROJECT_ID: firebaseConfig.projectId,
+  VITE_FIREBASE_APP_ID: firebaseConfig.appId,
 };
 
 const missingFirebaseConfig = Object.entries(requiredFirebaseConfig)
@@ -33,14 +36,26 @@ const missingFirebaseConfig = Object.entries(requiredFirebaseConfig)
 
 if (missingFirebaseConfig.length > 0) {
   throw new Error(
-    `Missing required Firebase configuration: ${missingFirebaseConfig.join(", ")}. Check the VITE_FIREBASE_* environment variables.`,
+    `Missing required Firebase configuration: ${missingFirebaseConfig.join(
+      ", ",
+    )}. Check the frontend .env file or deployment environment variables.`,
   );
 }
 
-// Reuse the default app during Vite hot reloads instead of creating duplicates.
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
 const auth = getAuth(app);
+
+let analytics = null;
+
+if (typeof window !== "undefined" && firebaseConfig.measurementId) {
+  try {
+    analytics = getAnalytics(app);
+  } catch (analyticsError) {
+    console.warn("[Firebase] Analytics is unavailable in this environment.", {
+      error: analyticsError,
+    });
+  }
+}
 
 let db;
 
@@ -50,7 +65,7 @@ try {
       tabManager: persistentMultipleTabManager(),
     }),
   });
-  console.info("[Firestore] IndexedDB offline persistence initialized");
+  console.info("[Firestore] IndexedDB offline persistence initialized.");
 } catch (persistenceError) {
   const code =
     typeof persistenceError === "object" &&
@@ -59,13 +74,17 @@ try {
       ? String(persistenceError.code)
       : "unknown";
 
-  if (code.includes("failed-precondition") || code.includes("unimplemented")) {
+  if (
+    code.includes("already-initialized") ||
+    code.includes("failed-precondition") ||
+    code.includes("unimplemented")
+  ) {
     console.warn(
-      "[Firestore] Persistent cache is unavailable; continuing with the existing Firestore cache.",
+      "[Firestore] Persistent cache is unavailable; using the active Firestore instance.",
       { code },
     );
   } else {
-    console.error("[Firestore] Persistent cache initialization failed", {
+    console.error("[Firestore] Persistent cache initialization failed.", {
       code,
       error: persistenceError,
     });
@@ -74,8 +93,7 @@ try {
   db = getFirestore(app);
 }
 
-console.log("Firebase SDK Initialized:", !!auth);
-console.info("[Firebase] Active authentication project", {
+console.info("[Firebase] Initialized project.", {
   projectId: app.options.projectId,
   authDomain: app.options.authDomain,
 });

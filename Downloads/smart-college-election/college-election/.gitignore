@@ -26,6 +26,7 @@ firebase-export-metadata.json
 serviceAccount*.json
 
 # Local data / PII
+new_students.json
 src/frontend/students.json
 
 # Logs and caches

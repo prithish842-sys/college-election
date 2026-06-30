@@ -86,20 +86,15 @@ Do not commit:
 
 - service account JSON files
 - `.env` files with secrets
-- local voter seed data such as `students.json`
+- local voter seed data such as `new_students.json`
 
 ## Firestore Seed
 
-To seed local voter data:
+To seed voter data from the root `new_students.json` file:
 
 ```bash
 npm run seed:firestore
 ```
-
-Available flags:
-
-- `--dry-run`
-- `--reset-votes`
 
 ## Firebase Hosting
 

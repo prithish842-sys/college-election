@@ -55,13 +55,19 @@ let adminSnapshotHandler: ((snapshot: unknown) => void) | undefined;
 let adminSnapshotErrorHandler: ((error: unknown) => void) | undefined;
 
 vi.mock("firebase/firestore", () => ({
-  collection: (...args: unknown[]) => collectionMock(...args),
-  doc: (...args: unknown[]) => docMock(...args),
-  getDoc: (...args: unknown[]) => getDocMock(...args),
-  increment: (...args: unknown[]) => incrementMock(...args),
-  onSnapshot: (...args: unknown[]) => onSnapshotMock(...args),
-  serverTimestamp: (...args: unknown[]) => serverTimestampMock(...args),
-  writeBatch: (...args: unknown[]) => writeBatchMock(...args),
+  collection: (db: unknown, collectionName: unknown) =>
+    collectionMock(db, collectionName),
+  doc: (dbOrCollection: unknown, collectionName?: unknown, id?: unknown) =>
+    docMock(dbOrCollection, collectionName, id),
+  getDoc: (reference: unknown) => getDocMock(reference),
+  increment: (value: unknown) => incrementMock(value),
+  onSnapshot: (
+    reference: unknown,
+    onNext: unknown,
+    onError: unknown,
+  ) => onSnapshotMock(reference, onNext, onError),
+  serverTimestamp: () => serverTimestampMock(),
+  writeBatch: (db: unknown) => writeBatchMock(db),
 }));
 
 vi.mock("../../firebase.js", () => ({

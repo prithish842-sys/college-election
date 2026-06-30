@@ -3,6 +3,7 @@ import {
   AlertCircle,
   ArrowRight,
   BadgeCheck,
+  CalendarDays,
   LoaderCircle,
   ShieldCheck,
 } from "lucide-react";
@@ -15,9 +16,13 @@ import { SharedVotingUI } from "./SharedVotingUI";
 type MobileViewState = "home" | "login" | "voting";
 
 interface VoterRecord {
-  has_voted?: unknown;
+  name?: unknown;
+  studentId?: unknown;
+  dateOfBirth?: unknown;
+  hasVoted?: unknown;
 }
 
+const VOTERS_COLLECTION = "voters";
 const VERIFICATION_TIMEOUT_MS = 10_000;
 
 async function getStudentSnapshot(studentId: string) {
@@ -25,7 +30,7 @@ async function getStudentSnapshot(studentId: string) {
 
   try {
     return await Promise.race([
-      getDoc(doc(db, "students", studentId)),
+      getDoc(doc(db, VOTERS_COLLECTION, studentId)),
       new Promise<never>((_, reject) => {
         timeoutId = window.setTimeout(() => {
           reject(new Error("Student ID verification timed out."));
@@ -40,6 +45,7 @@ async function getStudentSnapshot(studentId: string) {
 export const MobilePortal = memo(function MobilePortal() {
   const [viewState, setViewState] = useState<MobileViewState>("home");
   const [studentId, setStudentId] = useState("");
+  const [dob, setDob] = useState("");
   const [verifiedStudentId, setVerifiedStudentId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -56,9 +62,15 @@ export const MobilePortal = memo(function MobilePortal() {
       if (verificationInFlightRef.current) return;
 
       const normalizedStudentId = studentId.trim().toUpperCase();
+      const normalizedDateOfBirth = dob.trim();
 
       if (!normalizedStudentId) {
         setError("Enter your Student ID.");
+        return;
+      }
+
+      if (!normalizedDateOfBirth) {
+        setError("Enter your Date of Birth.");
         return;
       }
 
@@ -76,12 +88,22 @@ export const MobilePortal = memo(function MobilePortal() {
 
         const voter = voterSnapshot?.data?.() as VoterRecord | undefined;
 
-        if (voter?.has_voted === true) {
+        if (voter?.studentId !== normalizedStudentId) {
+          setError("Invalid Student ID.");
+          return;
+        }
+
+        if (voter?.dateOfBirth !== normalizedDateOfBirth) {
+          setError("Incorrect Date of Birth. Access Denied.");
+          return;
+        }
+
+        if (voter?.hasVoted === true) {
           setError("You have already voted.");
           return;
         }
 
-        if (voter?.has_voted !== false) {
+        if (voter?.hasVoted !== false) {
           setError(
             "Voting eligibility could not be verified. Contact an administrator.",
           );
@@ -93,19 +115,24 @@ export const MobilePortal = memo(function MobilePortal() {
       } catch (verificationError) {
         console.error("[Firestore] Student ID verification failed", {
           error: verificationError,
-          studentId: normalizedStudentId,
         });
-        setError("Unable to verify your Student ID. Please try again.");
+        setError(
+          verificationError instanceof Error &&
+            verificationError.message.includes("timed out")
+            ? "Student ID verification timed out. Please try again."
+            : "Unable to reach the secure voter registry. Please check your connection and try again.",
+        );
       } finally {
         verificationInFlightRef.current = false;
         setIsLoading(false);
       }
     },
-    [studentId],
+    [dob, studentId],
   );
 
   const resetToHome = useCallback(() => {
     setStudentId("");
+    setDob("");
     setVerifiedStudentId("");
     setError("");
     setIsLoading(false);
@@ -149,7 +176,7 @@ export const MobilePortal = memo(function MobilePortal() {
             Verify your identity
           </h1>
           <p className="mt-3 max-w-sm text-sm leading-6 text-white/60">
-            Enter the Student ID registered with the college.
+            Enter the Student ID and Date of Birth registered with the college.
           </p>
         </div>
 
@@ -165,12 +192,26 @@ export const MobilePortal = memo(function MobilePortal() {
               if (error) setError("");
             }}
           />
+          <PortalInput
+            id="date-of-birth"
+            label="Date of Birth (Password)"
+            value={dob}
+            type="date"
+            icon="date"
+            max={new Date().toISOString().slice(0, 10)}
+            placeholder="YYYY-MM-DD"
+            autoComplete="bday"
+            onChange={(value) => {
+              setDob(value);
+              if (error) setError("");
+            }}
+          />
           <PortalError error={error} />
           <SubmitButton
             isLoading={isLoading}
-            disabled={!studentId.trim()}
-            loadingText="Verifying ID..."
-            label="Verify ID"
+            disabled={!studentId.trim() || !dob.trim()}
+            loadingText="Verifying..."
+            label="Verify voter"
           />
         </form>
       </section>
@@ -182,6 +223,9 @@ interface PortalInputProps {
   id: string;
   label: string;
   value: string;
+  type?: "text" | "date";
+  icon?: "student" | "date";
+  max?: string;
   placeholder: string;
   autoComplete: string;
   onChange: (value: string) => void;
@@ -191,10 +235,22 @@ function PortalInput({
   id,
   label,
   value,
+  type = "text",
+  icon = "student",
+  max,
   placeholder,
   autoComplete,
   onChange,
 }: PortalInputProps) {
+  const Icon = icon === "date" ? CalendarDays : BadgeCheck;
+  const isDateInput = type === "date";
+  const iconClassName = isDateInput
+    ? "pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-200/80 transition-all duration-300 ease-in-out group-hover:text-blue-100 group-focus-within:text-blue-100"
+    : "pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/35";
+  const inputClassName = isDateInput
+    ? "h-12 w-full rounded-xl border border-white/15 bg-white/[0.07] py-3 pl-12 pr-4 text-base text-white shadow-sm outline-none transition-all duration-300 ease-in-out placeholder:text-white/35 hover:border-blue-300/40 hover:bg-white/10 hover:shadow-md focus:scale-[1.02] focus:border-transparent focus:bg-white/10 focus:shadow-md focus:ring-2 focus:ring-blue-500"
+    : "h-12 w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-12 pr-4 text-base text-white outline-none transition placeholder:text-white/30 focus:border-blue-400/60 focus:ring-4 focus:ring-blue-500/10";
+
   return (
     <div>
       <label
@@ -203,22 +259,23 @@ function PortalInput({
       >
         {label}
       </label>
-      <div className="relative">
-        <BadgeCheck
-          className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/35"
+      <div className="group relative">
+        <Icon
+          className={iconClassName}
           aria-hidden="true"
         />
         <input
           id={id}
-          type="text"
-          inputMode="text"
+          type={type}
+          inputMode={type === "date" ? undefined : "text"}
           autoComplete={autoComplete}
           autoCapitalize="none"
           spellCheck={false}
           value={value}
+          max={max}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className="h-12 w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-12 pr-4 text-base text-white outline-none transition placeholder:text-white/30 focus:border-blue-400/60 focus:ring-4 focus:ring-blue-500/10"
+          className={inputClassName}
           required
         />
       </div>

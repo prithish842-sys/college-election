@@ -2,19 +2,17 @@ import { CANDIDATES, POSITIONS } from "@/data/electionData";
 import type { Vote } from "@/types/election";
 import {
   type Transaction,
-  type WriteBatch,
   collection,
   doc,
   increment,
   runTransaction,
   serverTimestamp,
-  writeBatch,
 } from "firebase/firestore";
 import { db } from "../../firebase.js";
 
 const BALLOTS_COLLECTION = "ballots";
 const CANDIDATE_TOTALS_COLLECTION = "candidate_totals";
-const STUDENTS_COLLECTION = "students";
+const VOTERS_COLLECTION = "voters";
 
 function validateVotes(votes: Vote) {
   const hasEveryVote = POSITIONS.every((position) => {
@@ -54,43 +52,13 @@ function applyCandidateVoteIncrements(transaction: Transaction, votes: Vote) {
   }
 }
 
-function applyCandidateVoteIncrementsToBatch(batch: WriteBatch, votes: Vote) {
-  for (const [positionId, candidateId] of Object.entries(votes)) {
-    const candidate = CANDIDATES.find(
-      (entry) => entry.id === candidateId && entry.positionId === positionId,
-    );
-
-    if (!candidate) {
-      throw new Error("One or more selected candidates are invalid.");
-    }
-
-    batch.set(
-      doc(db, CANDIDATE_TOTALS_COLLECTION, candidate.id),
-      {
-        candidate_id: candidate.id,
-        candidate_name: candidate.name,
-        position_id: candidate.positionId,
-        votes_count: increment(1),
-        updated_at: serverTimestamp(),
-      },
-      { merge: true },
-    );
-  }
-}
-
 function getFirestoreErrorCode(error: unknown) {
   return typeof error === "object" && error && "code" in error
     ? String(error.code).toLowerCase()
     : "unknown";
 }
 
-function isBrowserOffline() {
-  return typeof navigator !== "undefined" && navigator.onLine === false;
-}
-
 function isNetworkRelatedError(error: unknown) {
-  if (isBrowserOffline()) return true;
-
   const code = getFirestoreErrorCode(error);
   return (
     code.includes("unavailable") ||
@@ -102,61 +70,58 @@ function isNetworkRelatedError(error: unknown) {
 export async function submitBallot(studentId: string, votes: Vote) {
   validateVotes(votes);
 
-  const voterReference = doc(db, STUDENTS_COLLECTION, studentId);
+  const voterReference = doc(db, VOTERS_COLLECTION, studentId);
   const ballotReference = doc(db, BALLOTS_COLLECTION, studentId);
-  const batch = writeBatch(db);
-
-  batch.set(ballotReference, {
-    source: "mobile",
-    student_id: studentId,
-    votes,
-    submitted_at: serverTimestamp(),
-  });
-  batch.update(voterReference, {
-    has_voted: true,
-    voted_at: serverTimestamp(),
-  });
-  applyCandidateVoteIncrementsToBatch(batch, votes);
-
-  let commitPromise: Promise<void>;
 
   try {
-    commitPromise = batch.commit();
+    await runTransaction(db, async (transaction) => {
+      const voterSnapshot = await transaction.get(voterReference);
+
+      if (!voterSnapshot.exists()) {
+        throw new Error("Invalid Student ID.");
+      }
+
+      const voter = voterSnapshot.data() as { hasVoted?: unknown };
+
+      if (voter.hasVoted === true) {
+        throw new Error("You have already voted.");
+      }
+
+      if (voter.hasVoted !== false) {
+        throw new Error(
+          "Voting eligibility could not be verified. Contact an administrator.",
+        );
+      }
+
+      transaction.set(ballotReference, {
+        source: "mobile",
+        student_id: studentId,
+        votes,
+        submitted_at: serverTimestamp(),
+      });
+      transaction.update(voterReference, {
+        hasVoted: true,
+      });
+      applyCandidateVoteIncrements(transaction, votes);
+    });
+
+    console.info("[Firestore] Mobile ballot synchronized", {
+      ballotId: ballotReference.id,
+    });
   } catch (writeError) {
     if (isNetworkRelatedError(writeError)) {
-      console.warn("Offline caching active", {
+      console.warn("[Firestore] Mobile ballot submission network failure", {
         ballotId: ballotReference.id,
         code: getFirestoreErrorCode(writeError),
         error: writeError,
       });
-      return;
+      throw new Error(
+        "Unable to submit your vote right now. Please check your connection and try again.",
+      );
     }
 
     throw writeError;
   }
-
-  void commitPromise
-    .then(() => {
-      console.info("[Firestore] Mobile ballot synchronized", {
-        ballotId: ballotReference.id,
-      });
-    })
-    .catch((writeError) => {
-      const details = {
-        ballotId: ballotReference.id,
-        code: getFirestoreErrorCode(writeError),
-        error: writeError,
-      };
-
-      if (isNetworkRelatedError(writeError)) {
-        console.warn("Offline caching active", details);
-      } else {
-        console.error(
-          "[Firestore] Mobile ballot synchronization failed",
-          details,
-        );
-      }
-    });
 }
 
 export async function submitKioskBallot(votes: Vote) {
