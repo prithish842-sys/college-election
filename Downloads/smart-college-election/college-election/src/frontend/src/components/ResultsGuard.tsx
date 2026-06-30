@@ -2,10 +2,7 @@ import { LockKeyhole } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { ResultsDashboard } from "./ResultsDashboard";
 
-const ADMIN_PASSCODE =
-  typeof import.meta.env?.VITE_RESULTS_ADMIN_PASSCODE === "string"
-    ? import.meta.env.VITE_RESULTS_ADMIN_PASSCODE.trim()
-    : "";
+const ADMIN_PASSCODE = "admin@123";
 
 export function ResultsGuard() {
   const [passcode, setPasscode] = useState("");
@@ -14,11 +11,6 @@ export function ResultsGuard() {
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    if (!ADMIN_PASSCODE) {
-      setError("Admin results access is not configured.");
-      return;
-    }
 
     if (passcode === ADMIN_PASSCODE) {
       setError("");
