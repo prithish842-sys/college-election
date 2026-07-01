@@ -1,6 +1,7 @@
 import { KioskPortal } from "@/components/KioskPortal";
 import { MobilePortal } from "@/components/MobilePortal";
 import { ResultsGuard } from "@/components/ResultsGuard";
+import { Analytics } from "@vercel/analytics/react";
 import {
   Outlet,
   RouterProvider,
@@ -53,7 +54,12 @@ declare module "@tanstack/react-router" {
 }
 
 function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <>
+      <RouterProvider router={router} />
+      <Analytics />
+    </>
+  );
 }
 
 export default App;
