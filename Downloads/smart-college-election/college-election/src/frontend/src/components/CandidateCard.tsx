@@ -25,10 +25,18 @@ export const CandidateCard = memo(function CandidateCard({
   const avatarUrl = getAvatarUrl(candidateName);
 
   return (
-    <article
+    <button
+      type="button"
       data-ocid="candidate.card"
-      className={`group relative flex h-full min-h-[254px] w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border bg-white p-5 text-center transition duration-300 ease-in-out hover:bg-[#fdfdfd] ${
-        isSelected ? "border-blue-500" : "border-slate-200 hover:border-blue-200"
+      onClick={() => {
+        if (candidateId) onSelect(candidateId);
+      }}
+      aria-pressed={isSelected}
+      aria-label={`${isSelected ? "Selected: " : "Select "}${candidateName}`}
+      className={`group relative flex h-full min-h-[254px] w-full min-w-0 cursor-pointer appearance-none flex-col items-center justify-center overflow-hidden rounded-2xl border bg-white p-5 text-center transition duration-300 ease-in-out hover:scale-[1.02] hover:bg-[#fdfdfd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${
+        isSelected
+          ? "border-blue-500"
+          : "border-slate-200 hover:border-blue-200"
       }`}
       style={{
         boxShadow: isSelected
@@ -46,12 +54,12 @@ export const CandidateCard = memo(function CandidateCard({
       }}
     >
       {isSelected && (
-        <div className="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/25">
+        <span className="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/25">
           <Check size={15} strokeWidth={3} aria-hidden="true" />
-        </div>
+        </span>
       )}
 
-      <div className="mx-auto mt-1 flex h-[clamp(5rem,10vh,7rem)] w-[clamp(5rem,10vh,7rem)] shrink-0 items-center justify-center rounded-full bg-blue-50 p-1.5">
+      <span className="mx-auto mt-1 flex h-[clamp(5rem,10vh,7rem)] w-[clamp(5rem,10vh,7rem)] shrink-0 items-center justify-center rounded-full bg-blue-50 p-1.5">
         <img
           src={avatarUrl}
           alt=""
@@ -60,33 +68,28 @@ export const CandidateCard = memo(function CandidateCard({
           className="h-full w-full rounded-full object-cover"
           draggable={false}
         />
-      </div>
+      </span>
 
-      <div className="mt-4 min-h-0 flex-1">
-        <h3 className="line-clamp-2 font-display text-[clamp(1rem,1.25vw,1.2rem)] font-bold leading-tight text-slate-950">
+      <span className="mt-4 block min-h-0 flex-1">
+        <span className="line-clamp-2 font-display text-[clamp(1rem,1.25vw,1.2rem)] font-bold leading-tight text-slate-950">
           {candidateName}
-        </h3>
-        <p className="mx-auto mt-2 line-clamp-3 max-w-[16rem] text-[clamp(0.78rem,0.9vw,0.9rem)] leading-5 text-slate-500">
+        </span>
+        <span className="mx-auto mt-2 block line-clamp-3 max-w-[16rem] text-[clamp(0.78rem,0.9vw,0.9rem)] leading-5 text-slate-500">
           {candidateDescription}
-        </p>
-      </div>
+        </span>
+      </span>
 
-      <button
-        type="button"
+      <span
         data-ocid="candidate.select_button"
-        onClick={() => {
-          if (candidateId) onSelect(candidateId);
-        }}
-        aria-pressed={isSelected}
-        aria-label={`${isSelected ? "Selected: " : "Select "}${candidateName}`}
-        className={`mt-4 min-h-11 w-full rounded-xl px-4 text-sm font-bold tracking-wide text-white shadow-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+        aria-hidden="true"
+        className={`mt-4 flex min-h-11 w-full items-center justify-center rounded-xl px-4 text-sm font-bold tracking-wide text-white shadow-lg transition ${
           isSelected
             ? "bg-blue-700 shadow-blue-700/25"
             : "bg-blue-600 shadow-blue-600/25 hover:bg-blue-700"
         }`}
       >
         {isSelected ? "Voted" : "Vote"}
-      </button>
-    </article>
+      </span>
+    </button>
   );
 });
