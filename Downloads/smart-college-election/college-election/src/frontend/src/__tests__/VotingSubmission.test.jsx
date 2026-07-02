@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { KioskVotingDashboard } from "../components/KioskVotingDashboard";
+import { BoothVotingDashboard } from "../components/BoothVotingDashboard";
 import { CANDIDATES, POSITIONS } from "../data/electionData";
 import { submitBallot } from "../lib/voting";
 
@@ -115,7 +115,7 @@ describe("voting submission", () => {
     batchCommitMock.mockRejectedValueOnce({ code: "unavailable" });
 
     render(
-      <KioskVotingDashboard
+      <BoothVotingDashboard
         mode="mobile"
         studentId="24BSC002"
         onSessionComplete={vi.fn()}
@@ -190,3 +190,4 @@ describe("voting submission", () => {
     });
   });
 });
+

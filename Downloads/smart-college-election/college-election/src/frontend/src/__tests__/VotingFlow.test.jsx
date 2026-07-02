@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
-import { KioskPortal } from "../components/KioskPortal";
+import { BoothPortal } from "../components/BoothPortal";
 import { MobilePortal } from "../components/MobilePortal";
 
 const getDocMock = vi.fn();
@@ -61,10 +61,10 @@ vi.mock("../components/SharedVotingUI", async () => {
 
   return {
     SharedVotingUI: ({ mode, onSessionComplete }) => {
-      if (mode === "kiosk") {
+      if (mode === "booth") {
         const { VoteSuccessScreen } = actual;
 
-        return <VoteSuccessScreen mode="kiosk" onReset={onSessionComplete} />;
+        return <VoteSuccessScreen mode="booth" onReset={onSessionComplete} />;
       }
 
       return <div>Mock Voting UI</div>;
@@ -187,9 +187,9 @@ describe("Voting flow guards", () => {
     ).toBeTruthy();
   });
 
-  it("keeps the kiosk success screen locked until the spacebar is pressed", async () => {
+  it("keeps the booth success screen locked until the spacebar is pressed", async () => {
     const user = userEvent.setup();
-    render(<KioskPortal />);
+    render(<BoothPortal />);
 
     await user.click(screen.getByRole("button", { name: /enter portal/i }));
 
@@ -221,3 +221,4 @@ describe("Voting flow guards", () => {
     });
   });
 });
+

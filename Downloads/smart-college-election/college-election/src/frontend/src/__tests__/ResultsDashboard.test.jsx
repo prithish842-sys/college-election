@@ -96,7 +96,7 @@ describe("ResultsDashboard", () => {
       .getByText("Standing members")
       .closest("article");
     expect(within(totalBallotsCard).getByText("2")).toBeTruthy();
-    expect(screen.getAllByRole("heading", { name: "Chairman" }).length).toBe(2);
+    expect(screen.getAllByRole("heading", { name: "President" }).length).toBe(2);
     expect(within(standingMembersPanel).getByText("Arjun Mehta")).toBeTruthy();
     expect(screen.getAllByText("Leading").length).toBeGreaterThan(0);
     expect(screen.getByText("100% of 2")).toBeTruthy();
@@ -149,23 +149,23 @@ describe("ResultsDashboard", () => {
       );
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Vice Chairman" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vice-President" }));
 
     await waitFor(() => {
       expect(
-        screen.getAllByRole("heading", { name: "Vice Chairman" }).length,
+        screen.getAllByRole("heading", { name: "Vice-President" }).length,
       ).toBe(2);
     });
 
-    const viceChairmanPanel = screen
+    const vicePresidentPanel = screen
       .getByText("Standing members")
       .closest("article");
 
     expect(
       screen.getByText("Live ranking for the selected ballot position."),
     ).toBeTruthy();
-    expect(within(viceChairmanPanel).getByText("Kavya Nair")).toBeTruthy();
-    expect(within(viceChairmanPanel).getByText("Ishaan Gupta")).toBeTruthy();
+    expect(within(vicePresidentPanel).getByText("Kavya Nair")).toBeTruthy();
+    expect(within(vicePresidentPanel).getByText("Ishaan Gupta")).toBeTruthy();
     expect(screen.getAllByText("Leading").length).toBeGreaterThan(1);
   });
 
@@ -185,3 +185,4 @@ describe("ResultsDashboard", () => {
     expect(unsubscribeMock).toHaveBeenCalledTimes(1);
   });
 });
+

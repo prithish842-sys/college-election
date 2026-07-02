@@ -2,7 +2,7 @@ import { CheckCircle2, Keyboard } from "lucide-react";
 import { memo, useEffect } from "react";
 
 interface VoteSuccessScreenProps {
-  mode: "kiosk" | "mobile";
+  mode: "booth" | "mobile";
   onReset: () => void;
 }
 
@@ -11,7 +11,7 @@ export const VoteSuccessScreen = memo(function VoteSuccessScreen({
   onReset,
 }: VoteSuccessScreenProps) {
   useEffect(() => {
-    if (mode !== "kiosk") return;
+    if (mode !== "booth") return;
 
     const handleSecretReset = (event: KeyboardEvent) => {
       if (event.code === "Space" || event.keyCode === 32) {
@@ -45,10 +45,10 @@ export const VoteSuccessScreen = memo(function VoteSuccessScreen({
           complete.
         </p>
 
-        {mode === "kiosk" ? (
+        {mode === "booth" ? (
           <div
             className="mt-8 flex items-center justify-center gap-2 text-xs text-white/20"
-            aria-label="Waiting for the kiosk administrator"
+            aria-label="Waiting for the booth administrator"
           >
             <Keyboard className="h-4 w-4" aria-hidden="true" />
             Session locked

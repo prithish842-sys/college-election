@@ -58,45 +58,22 @@ export const ConfirmationScreen = memo(function ConfirmationScreen({
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4 py-16"
+      className="flex h-screen items-center justify-center overflow-hidden bg-[#F9FAFB] px-3 py-3 sm:px-4 sm:py-4"
       style={{
-        background:
-          "linear-gradient(160deg, #0a0e1a 0%, #0d1633 50%, #0a0e1a 100%)",
+        background: "#F9FAFB",
       }}
     >
-      {/* Ambient glow */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          width: 600,
-          height: 600,
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle, rgba(37,99,235,0.12) 0%, transparent 70%)",
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-      />
-
       <motion.div
         data-ocid="confirmation.panel"
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
-        className="relative z-10 w-full max-w-2xl"
+        className="relative z-10 max-h-[calc(100vh-1.5rem)] w-full max-w-3xl"
         style={{
-          background:
-            "linear-gradient(145deg, rgba(13,22,51,0.9) 0%, rgba(10,14,26,0.95) 100%)",
-          backdropFilter: "blur(24px)",
-          WebkitBackdropFilter: "blur(24px)",
-          border: "1px solid rgba(37,99,235,0.3)",
+          background: "#FFFFFF",
+          border: "1px solid #E5E7EB",
           borderRadius: "1.5rem",
-          boxShadow:
-            "0 0 60px rgba(37,99,235,0.2), 0 24px 80px rgba(0,0,0,0.6)",
+          boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
           overflow: "hidden",
         }}
       >
@@ -105,35 +82,31 @@ export const ConfirmationScreen = memo(function ConfirmationScreen({
           aria-hidden="true"
           style={{
             height: 4,
-            background:
-              "linear-gradient(90deg, #1e4a8a 0%, #2563eb 50%, #60a5fa 100%)",
-            boxShadow: "0 0 16px rgba(37,99,235,0.6)",
+            background: "linear-gradient(90deg, #2563eb 0%, #60a5fa 100%)",
           }}
         />
 
-        <div className="px-6 sm:px-10 py-10">
+        <div className="px-4 py-4 sm:px-8 sm:py-5">
           {/* Icon */}
           <motion.div
             initial={{ scale: 0.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.6, ease: "backOut" }}
-            className="flex justify-center mb-6"
+            className="mb-3 flex justify-center"
           >
             <div
-              className="flex items-center justify-center w-20 h-20 rounded-2xl"
+              className="flex h-14 w-14 items-center justify-center rounded-2xl sm:h-16 sm:w-16"
               style={{
-                background:
-                  "linear-gradient(135deg, rgba(37,99,235,0.2) 0%, rgba(30,74,138,0.35) 100%)",
-                border: "1px solid rgba(96,165,250,0.4)",
-                boxShadow: "0 0 32px rgba(37,99,235,0.35)",
+                background: "#EFF6FF",
+                border: "1px solid #BFDBFE",
+                boxShadow: "0 10px 15px -3px rgba(37, 99, 235, 0.12)",
               }}
             >
               <CheckCircle2
-                size={44}
+                size={34}
                 strokeWidth={1.5}
                 style={{
-                  color: "#60a5fa",
-                  filter: "drop-shadow(0 0 8px rgba(96,165,250,0.7))",
+                  color: "#2563EB",
                 }}
               />
             </div>
@@ -144,23 +117,18 @@ export const ConfirmationScreen = memo(function ConfirmationScreen({
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35, duration: 0.7 }}
-            className="text-center mb-8"
+            className="mb-4 text-center"
           >
             <h1
-              className="font-display font-bold mb-2"
+              className="font-display mb-1 font-bold text-[#111827]"
               style={{
                 fontFamily: "Space Grotesk, sans-serif",
-                fontSize: "clamp(1.6rem, 5vw, 2.2rem)",
-                letterSpacing: "-0.02em",
-                background:
-                  "linear-gradient(135deg, #e2e8f0 20%, #93c5fd 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
+                fontSize: "clamp(1.35rem, 4vw, 1.9rem)",
               }}
             >
               Your vote has been cast
             </h1>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-xs font-medium text-[#4B5563] sm:text-sm">
               All {positions.length} positions have been recorded.
             </p>
           </motion.div>
@@ -170,8 +138,8 @@ export const ConfirmationScreen = memo(function ConfirmationScreen({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.55, duration: 0.7 }}
-            className="mb-8 rounded-xl overflow-hidden"
-            style={{ border: "1px solid rgba(37,99,235,0.2)" }}
+            className="mb-4 overflow-hidden rounded-xl bg-white"
+            style={{ border: "1px solid #E5E7EB" }}
           >
             {positions.map((position, index) => {
               const voted = votedCandidatesByPosition.get(position.id);
@@ -179,36 +147,32 @@ export const ConfirmationScreen = memo(function ConfirmationScreen({
                 <div
                   key={position.id}
                   data-ocid={`confirmation.result.item.${index + 1}`}
-                  className="flex items-center gap-3 px-4 py-3"
+                  className="flex items-center gap-2 px-3 py-1.5 sm:gap-3 sm:px-4 sm:py-2"
                   style={{
-                    background:
-                      index % 2 === 0
-                        ? "rgba(13,22,51,0.6)"
-                        : "rgba(10,14,26,0.4)",
+                    background: index % 2 === 0 ? "#FFFFFF" : "#F9FAFB",
                     borderBottom:
                       index < positions.length - 1
-                        ? "1px solid rgba(37,99,235,0.1)"
+                        ? "1px solid #E5E7EB"
                         : "none",
                   }}
                 >
-                  <span className="text-base flex-shrink-0">
+                  <span className="flex-shrink-0 text-sm sm:text-base">
                     {position.icon}
                   </span>
                   <span
-                    className="text-xs font-semibold min-w-0"
+                    className="min-w-0 flex-shrink-0 text-sm font-semibold sm:text-base"
                     style={{
                       fontFamily: "Space Grotesk, sans-serif",
-                      color: "rgba(148,163,184,0.9)",
-                      width: 140,
-                      flexShrink: 0,
+                      color: "#374151",
+                      width: "clamp(9.5rem, 28vw, 13rem)",
                     }}
                   >
                     {position.title}
                   </span>
                   <span
-                    className="flex-1 text-sm font-medium truncate"
+                    className="flex-1 truncate text-lg font-bold sm:text-xl"
                     style={{
-                      color: voted ? "#93c5fd" : "rgba(148,163,184,0.4)",
+                      color: voted ? "#111827" : "#9CA3AF",
                       fontFamily: "Space Grotesk, sans-serif",
                     }}
                   >
@@ -216,8 +180,8 @@ export const ConfirmationScreen = memo(function ConfirmationScreen({
                   </span>
                   {voted && (
                     <CheckCircle2
-                      size={14}
-                      style={{ color: "#60a5fa", flexShrink: 0 }}
+                      size={16}
+                      style={{ color: "#2563EB", flexShrink: 0 }}
                     />
                   )}
                 </div>
@@ -228,7 +192,7 @@ export const ConfirmationScreen = memo(function ConfirmationScreen({
           {error && (
             <p
               role="alert"
-              className="mb-5 flex items-start justify-center gap-2 text-center text-xs leading-5 text-red-300"
+              className="mb-3 flex items-start justify-center gap-2 text-center text-xs leading-5 text-red-600"
             >
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {error}
@@ -242,16 +206,16 @@ export const ConfirmationScreen = memo(function ConfirmationScreen({
               data-ocid="confirmation.vote_again_button"
               onClick={() => void handleConfirm()}
               disabled={isSubmitting}
-              className="flex min-w-48 items-center justify-center gap-2 rounded-xl px-8 py-3 text-sm font-bold tracking-widest disabled:cursor-wait"
+              className="flex min-w-48 items-center justify-center gap-2 rounded-xl px-8 py-2.5 text-sm font-bold tracking-widest disabled:cursor-wait"
               style={{
                 fontFamily: "Space Grotesk, sans-serif",
-                background:
-                  "linear-gradient(135deg, rgba(37,99,235,0.15) 0%, rgba(30,74,138,0.25) 100%)",
-                border: "1px solid rgba(37,99,235,0.4)",
-                color: isSubmitting ? "#bfdbfe" : "#93c5fd",
+                background: isSubmitting ? "#93C5FD" : "#2563EB",
+                border: "1px solid #2563EB",
+                color: "#FFFFFF",
                 letterSpacing: "0.1em",
                 transition: "all 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
                 opacity: isSubmitting ? 0.8 : 1,
+                boxShadow: "0 10px 15px -3px rgba(37, 99, 235, 0.2)",
               }}
             >
               {isSubmitting && (

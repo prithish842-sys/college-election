@@ -348,14 +348,14 @@ export function HomePage({ onStartVoting }: HomePageProps) {
             className="mt-12 flex flex-wrap justify-center gap-3"
           >
             {[
-              "Chairman",
-              "Vice Chairman",
+              "President",
+              "Vice-President",
               "Secretary",
-              "Treasurer",
-              "Sports Head",
-              "Cultural Head",
-              "Technical Lead",
-              "Class Representative",
+              "Joint-Secretary",
+              "Sports-Secretary",
+              "Joint Sports-Secretary",
+              "Cultural-Secretary",
+              "Joint Cultural-Secretary",
             ].map((pos, i) => (
               <motion.span
                 key={pos}

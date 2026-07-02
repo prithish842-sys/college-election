@@ -1,5 +1,4 @@
 import { CandidateCard } from "@/components/CandidateCard";
-import { LogoMark } from "@/components/LogoMark";
 import type { Candidate, Position, Vote } from "@/types/election";
 import { memo, useCallback, useMemo } from "react";
 
@@ -44,44 +43,30 @@ export const VotingView = memo(function VotingView({
   }
 
   return (
-    <div
-      className="min-h-screen"
-      style={{
-        background:
-          "linear-gradient(160deg, #0a0e1a 0%, #0d1633 40%, #0a0e1a 100%)",
-      }}
-    >
-      <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
-        {/* Position header */}
-        <div className="text-center mb-10">
-          <div className="flex justify-center mb-5">
-            <LogoMark size={90} variant="plain" />
-          </div>
-
+    <div className="flex h-screen min-h-[720px] overflow-hidden bg-white text-slate-950">
+      <div className="mx-auto flex h-full w-full max-w-[1640px] flex-col px-5 py-5 sm:px-7 lg:px-9">
+        <div className="shrink-0 text-center">
           <h1
-            className="font-display font-bold text-foreground mb-2"
+            className="mb-2 font-display font-bold text-slate-950"
             style={{
               fontFamily: "Space Grotesk, sans-serif",
-              fontSize: "clamp(1.6rem, 4vw, 2.4rem)",
-              letterSpacing: "-0.02em",
-              background: "linear-gradient(135deg, #e2e8f0 30%, #93c5fd 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
+              fontSize: "clamp(1.75rem, 3vw, 2.6rem)",
             }}
           >
             Vote for {currentPosition.title}
           </h1>
-          <p className="text-muted-foreground text-sm max-w-xl mx-auto">
+          <p className="mx-auto max-w-3xl text-sm leading-6 text-slate-500">
             {currentPosition.description}
           </p>
         </div>
 
-        {/* Candidate grid */}
         <div
-          className="grid gap-4"
+          className="mt-5 grid min-h-0 flex-1"
           style={{
-            gridTemplateColumns:
-              "repeat(auto-fill, minmax(min(100%, 220px), 1fr))",
+            display: "grid",
+            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+            gridTemplateRows: "repeat(2, minmax(0, 1fr))",
+            gap: "1rem",
           }}
         >
           {positionCandidates.map((candidate) => (

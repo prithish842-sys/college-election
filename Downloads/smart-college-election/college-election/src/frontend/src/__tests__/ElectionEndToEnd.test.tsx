@@ -265,7 +265,7 @@ describe("College election end-to-end integration", () => {
       await screen.findByRole("heading", { name: /vote for vice chairman/i }),
     ).toBeTruthy();
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Chairman" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "President" })[0]);
 
     expect(
       await screen.findByRole("heading", { name: /vote for chairman/i }),
@@ -322,3 +322,4 @@ describe("College election end-to-end integration", () => {
     expect(adminSnapshotErrorHandler).toBeTypeOf("function");
   });
 });
+

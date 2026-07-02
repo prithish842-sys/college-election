@@ -106,7 +106,7 @@ describe("Admin ResultsDashboard live data", () => {
     expect(within(getStandingMembersPanel()).getByText("2")).toBeTruthy();
     expect(screen.getByText("67% of 3")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Vice Chairman" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vice-President" }));
 
     expect(
       within(getStandingMembersPanel()).getByText("Ishaan Gupta"),
@@ -160,3 +160,4 @@ describe("Admin ResultsDashboard live data", () => {
     ).toBeTruthy();
   });
 });
+

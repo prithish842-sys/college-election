@@ -28,14 +28,14 @@ function validateVotes(votes: Vote) {
   }
 }
 
-function getValidatedKioskId(kioskId: string | undefined) {
-  const normalizedKioskId = kioskId?.trim();
+function getValidatedBoothId(boothId: string | undefined) {
+  const normalizedBoothId = boothId?.trim();
 
-  if (!normalizedKioskId) {
-    throw new Error("Kiosk ID is missing from the voting URL.");
+  if (!normalizedBoothId) {
+    throw new Error("Booth ID is missing from the voting URL.");
   }
 
-  return normalizedKioskId;
+  return normalizedBoothId;
 }
 
 function applyCandidateVoteIncrements(transaction: Transaction, votes: Vote) {
@@ -134,17 +134,17 @@ export async function submitBallot(studentId: string, votes: Vote) {
   }
 }
 
-export async function submitKioskBallot(votes: Vote, kioskId: string) {
+export async function submitBoothBallot(votes: Vote, boothId: string) {
   validateVotes(votes);
-  const validatedKioskId = getValidatedKioskId(kioskId);
+  const validatedBoothId = getValidatedBoothId(boothId);
 
   const ballotReference = doc(collection(db, BALLOTS_COLLECTION));
 
   await runTransaction(db, async (transaction) => {
     transaction.set(ballotReference, {
       votes,
-      kioskId: validatedKioskId,
-      source: "kiosk",
+      boothId: validatedBoothId,
+      source: "booth",
       submitted_at: serverTimestamp(),
     });
     applyCandidateVoteIncrements(transaction, votes);

@@ -13,27 +13,18 @@ import {
   Users,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  LabelList,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { utils, writeFile } from "xlsx";
 import { db } from "../../firebase.js";
 import { CountUp } from "./CountUp";
 
 interface BallotRecord {
   votes?: Vote;
-  kioskId?: string;
+  boothId?: string;
 }
 
 interface CountedBallotRecord {
   votes: Vote;
-  kioskId?: string;
+  boothId?: string;
 }
 
 interface CandidateDetails {
@@ -53,14 +44,12 @@ interface StandingCandidate {
   isLeading: boolean;
 }
 
-interface ChartCandidateData {
-  name: string;
-  votes: number;
-  percentage?: number;
-}
-
-interface VoteTooltipPayload {
-  payload: ChartCandidateData;
+interface ReportRow {
+  Section: string;
+  Position: string;
+  Candidate: string;
+  "Candidate ID": string;
+  Votes: number | string;
 }
 
 const defaultCandidateDetails: CandidateDetails = {
@@ -125,7 +114,7 @@ function getVoteSignature(vote: Vote | undefined) {
 }
 
 function getBallotSignature(ballot: CountedBallotRecord) {
-  return `${ballot.kioskId ?? ""}:${getVoteSignature(ballot.votes)}`;
+  return `${ballot.boothId ?? ""}:${getVoteSignature(ballot.votes)}`;
 }
 
 function areBallotsEqual(
@@ -141,70 +130,98 @@ function areBallotsEqual(
   );
 }
 
-function VoteDistributionTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: VoteTooltipPayload[];
-}) {
-  if (!active || !payload?.length) return null;
+function getReportVoteTotals(ballotsToCount: CountedBallotRecord[]) {
+  const totals = new Map<string, number>();
 
-  const candidate = payload[0].payload;
+  for (const ballot of ballotsToCount) {
+    for (const candidateId of Object.values(ballot.votes)) {
+      totals.set(candidateId, (totals.get(candidateId) ?? 0) + 1);
+    }
+  }
 
-  return (
-    <div className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm shadow-xl shadow-slate-950/25">
-      <p className="font-semibold text-white">{candidate.name}</p>
-      <p className="mt-1 text-slate-200">
-        {voteFormatter.format(candidate.votes)} votes
-      </p>
-      {typeof candidate.percentage === "number" && (
-        <p className="text-xs text-slate-300">
-          {Math.round(candidate.percentage)}% of this position
-        </p>
-      )}
-    </div>
-  );
+  return totals;
 }
 
-function CandidateVoteBarChart({
-  data,
-  isDark,
-}: {
-  data: ChartCandidateData[];
-  isDark: boolean;
-}) {
-  return (
-    <BarChart
-      data={data}
-      layout="vertical"
-      margin={{ top: 20, right: 50, left: 20, bottom: 0 }}
-    >
-      <CartesianGrid
-        horizontal={false}
-        stroke={isDark ? "rgba(255,255,255,0.08)" : "rgba(148,163,184,0.25)"}
-      />
-      <XAxis type="number" hide={true} />
-      <YAxis
-        type="category"
-        dataKey="name"
-        stroke="#8884d8"
-        width={150}
-        tick={{ fill: "#cbd5e1" }}
-        axisLine={false}
-        tickLine={false}
-      />
-      <Tooltip content={<VoteDistributionTooltip />} />
-      <Bar dataKey="votes" fill="#10b981" radius={[0, 4, 4, 0]} barSize={24}>
-        <LabelList dataKey="votes" position="right" fill="#fff" />
-      </Bar>
-    </BarChart>
+function getLeadingCandidateSummary(
+  positionId: string,
+  totals: Map<string, number>,
+) {
+  const positionCandidates = getPositionCandidates(positionId);
+  const highestVotes = positionCandidates.reduce(
+    (currentHighest, candidate) =>
+      Math.max(currentHighest, totals.get(candidate.id) ?? 0),
+    0,
   );
+
+  if (highestVotes === 0) {
+    return {
+      candidateId: "",
+      candidateName: "No votes yet",
+      votes: 0,
+    };
+  }
+
+  const leaders = positionCandidates.filter(
+    (candidate) => (totals.get(candidate.id) ?? 0) === highestVotes,
+  );
+
+  return {
+    candidateId: leaders.map((candidate) => candidate.id).join(", "),
+    candidateName: leaders.map((candidate) => candidate.name).join(", "),
+    votes: highestVotes,
+  };
+}
+
+function createReportSheet(rows: ReportRow[]) {
+  const sheet = utils.json_to_sheet(rows);
+
+  sheet["!cols"] = [
+    { wch: 24 },
+    { wch: 28 },
+    { wch: 34 },
+    { wch: 18 },
+    { wch: 14 },
+  ];
+
+  return sheet;
+}
+
+function formatBoothLabel(boothId: string) {
+  const normalizedBoothId = boothId.trim();
+  const boothNumber = normalizedBoothId.match(/^booth[-_\s]*(\d+)$/i)?.[1];
+
+  if (boothNumber) {
+    return `Booth ${boothNumber}`;
+  }
+
+  return normalizedBoothId || "Unassigned Booth";
+}
+
+function sanitizeSheetName(sheetName: string) {
+  return (
+    sheetName.replace(/[:\\/?*[\]]/g, " ").replace(/\s+/g, " ").trim() ||
+    "Sheet"
+  ).slice(0, 31);
+}
+
+function getUniqueSheetName(sheetName: string, usedSheetNames: Set<string>) {
+  const safeSheetName = sanitizeSheetName(sheetName);
+  let uniqueSheetName = safeSheetName;
+  let duplicateCount = 2;
+
+  while (usedSheetNames.has(uniqueSheetName)) {
+    const suffix = ` ${duplicateCount}`;
+    uniqueSheetName = `${safeSheetName.slice(0, 31 - suffix.length)}${suffix}`;
+    duplicateCount += 1;
+  }
+
+  usedSheetNames.add(uniqueSheetName);
+  return uniqueSheetName;
 }
 
 export const ResultsDashboard = memo(function ResultsDashboard() {
   const [ballots, setBallots] = useState<CountedBallotRecord[]>([]);
-  const [selectedKiosk, setSelectedKiosk] = useState("Total");
+  const [selectedBooth, setSelectedBooth] = useState("Total");
   const [selectedPositionId, setSelectedPositionId] = useState(POSITIONS[0].id);
   const [isDark, setIsDark] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -230,10 +247,10 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
                 const countedBallot: CountedBallotRecord = {
                   votes: ballot.votes,
                 };
-                const kioskId = ballot.kioskId?.trim();
+                const boothId = ballot.boothId?.trim();
 
-                if (kioskId) {
-                  countedBallot.kioskId = kioskId;
+                if (boothId) {
+                  countedBallot.boothId = boothId;
                 }
 
                 return [countedBallot];
@@ -261,7 +278,7 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
     };
   }, []);
 
-  const kioskOptions = useMemo(() => {
+  const boothOptions = useMemo(() => {
     const collator = new Intl.Collator(undefined, {
       numeric: true,
       sensitivity: "base",
@@ -270,27 +287,27 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
     return Array.from(
       new Set(
         ballots
-          .map((ballot) => ballot.kioskId)
-          .filter((kioskId): kioskId is string => Boolean(kioskId)),
+          .map((ballot) => ballot.boothId)
+          .filter((boothId): boothId is string => Boolean(boothId)),
       ),
     ).sort(collator.compare);
   }, [ballots]);
 
   useEffect(() => {
-    if (selectedKiosk !== "Total" && !kioskOptions.includes(selectedKiosk)) {
-      setSelectedKiosk("Total");
+    if (selectedBooth !== "Total" && !boothOptions.includes(selectedBooth)) {
+      setSelectedBooth("Total");
     }
-  }, [kioskOptions, selectedKiosk]);
+  }, [boothOptions, selectedBooth]);
 
   const filteredVotes = useMemo(() => {
-    if (selectedKiosk === "Total") {
+    if (selectedBooth === "Total") {
       return ballots.map((ballot) => ballot.votes);
     }
 
     return ballots
-      .filter((ballot) => ballot.kioskId === selectedKiosk)
+      .filter((ballot) => ballot.boothId === selectedBooth)
       .map((ballot) => ballot.votes);
-  }, [ballots, selectedKiosk]);
+  }, [ballots, selectedBooth]);
 
   const totalVotes = filteredVotes.length;
 
@@ -317,8 +334,8 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
     setSelectedPositionId(positionId);
   }, []);
 
-  const selectKiosk = useCallback((kioskId: string) => {
-    setSelectedKiosk(kioskId);
+  const selectBooth = useCallback((boothId: string) => {
+    setSelectedBooth(boothId);
   }, []);
 
   const standingCandidates = useMemo<StandingCandidate[]>(() => {
@@ -373,65 +390,103 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
     [standingCandidates],
   );
 
-  const downloadCSV = useCallback(() => {
-    const escapeCsvValue = (value: string | number) => {
-      const normalizedValue = String(value);
+  const downloadExcelReport = useCallback(() => {
+    const workbook = utils.book_new();
+    const usedSheetNames = new Set<string>();
+    const overallTotals = getReportVoteTotals(ballots);
+    const summaryRows: ReportRow[] = [
+      {
+        Section: "Election Summary",
+        Position: "Total Overall Votes",
+        Candidate: "",
+        "Candidate ID": "",
+        Votes: ballots.length,
+      },
+      ...POSITIONS.map((position) => {
+        const leader = getLeadingCandidateSummary(position.id, overallTotals);
 
-      if (/[",\n\r]/.test(normalizedValue)) {
-        return `"${normalizedValue.replace(/"/g, '""')}"`;
-      }
-
-      return normalizedValue;
-    };
-
-    const rows = [
-      ["Position", selectedPosition.title],
-      ["Total votes in position", votesInPosition],
-      [],
-      ["Rank", "Candidate", "Votes", "Percentage"],
-      ...rankedStandingCandidates.map((candidate, index) => [
-        index + 1,
-        candidate.name,
-        candidate.votes,
-        `${Math.round(candidate.percentage)}%`,
-      ]),
+        return {
+          Section: "Global Leader",
+          Position: position.title,
+          Candidate: leader.candidateName,
+          "Candidate ID": leader.candidateId,
+          Votes: leader.votes,
+        };
+      }),
     ];
-    const csvContent = rows
-      .map((row) => row.map(escapeCsvValue).join(","))
-      .join("\n");
-    const blob = new Blob([csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
 
-    link.href = url;
-    link.download = `election_report_${selectedPosition.id}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }, [rankedStandingCandidates, selectedPosition, votesInPosition]);
+    utils.book_append_sheet(
+      workbook,
+      createReportSheet(summaryRows),
+      getUniqueSheetName("Summary", usedSheetNames),
+    );
+
+    const collator = new Intl.Collator(undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+    const ballotsByBooth = new Map<string, CountedBallotRecord[]>();
+
+    for (const ballot of ballots) {
+      const boothId = ballot.boothId?.trim() || "Unassigned Booth";
+      const boothBallots = ballotsByBooth.get(boothId) ?? [];
+
+      boothBallots.push(ballot);
+      ballotsByBooth.set(boothId, boothBallots);
+    }
+
+    for (const [boothId, boothBallots] of [...ballotsByBooth.entries()].sort(
+      ([firstBoothId], [secondBoothId]) =>
+        collator.compare(firstBoothId, secondBoothId),
+    )) {
+      const boothTotals = getReportVoteTotals(boothBallots);
+      const boothRows: ReportRow[] = [
+        {
+          Section: "Booth Summary",
+          Position: "Total Votes Cast",
+          Candidate: "",
+          "Candidate ID": "",
+          Votes: boothBallots.length,
+        },
+        ...POSITIONS.map((position) => {
+          const leader = getLeadingCandidateSummary(position.id, boothTotals);
+
+          return {
+            Section: "Booth Leader",
+            Position: position.title,
+            Candidate: leader.candidateName,
+            "Candidate ID": leader.candidateId,
+            Votes: leader.votes,
+          };
+        }),
+        ...POSITIONS.flatMap((position) =>
+          getPositionCandidates(position.id).map((candidate) => ({
+            Section: "Candidate Breakdown",
+            Position: position.title,
+            Candidate: candidate.name,
+            "Candidate ID": candidate.id,
+            Votes: boothTotals.get(candidate.id) ?? 0,
+          })),
+        ),
+      ];
+
+      utils.book_append_sheet(
+        workbook,
+        createReportSheet(boothRows),
+        getUniqueSheetName(formatBoothLabel(boothId), usedSheetNames),
+      );
+    }
+
+    writeFile(
+      workbook,
+      `election_report_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
+  }, [ballots]);
 
   const candidates = rankedStandingCandidates;
 
   if (import.meta.env.MODE !== "test") {
     console.log("RAW Candidates:", candidates);
-  }
-
-  const liveChartData = (candidates || []).map((candidate) => ({
-    name: candidate.name || "Unknown",
-    votes: Number(candidate.votes) || 0,
-    percentage: Number(candidate.percentage) || 0,
-  }));
-  const testData = [
-    { name: "Test User 1", votes: 15 },
-    { name: "Test User 2", votes: 8 },
-    { name: "Test User 3", votes: 2 },
-  ];
-
-  if (import.meta.env.MODE !== "test") {
-    console.log("Sanitized Chart Data:", liveChartData);
   }
 
   const leadingCandidates = useMemo(
@@ -444,7 +499,6 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
       ? leadingCandidates.map((candidate) => candidate.name).join(", ")
       : "No leader yet";
 
-  const canUseResponsiveChart = typeof ResizeObserver !== "undefined";
   const backgroundClassName = isDark
     ? "bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black text-white"
     : "bg-slate-50 text-slate-950";
@@ -506,7 +560,7 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <button
               type="button"
-              onClick={downloadCSV}
+              onClick={downloadExcelReport}
               className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border px-4 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
                 isDark
                   ? "border-white/10 bg-white/5 text-slate-100 shadow-[0_4px_30px_rgba(0,0,0,0.3)] focus-visible:ring-offset-slate-950"
@@ -636,24 +690,24 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
         )}
 
         <section
-          aria-label="Election kiosks"
+          aria-label="Election booths"
           className={`${subtleGlassClassName} overflow-x-auto p-2`}
         >
           <div className="flex min-w-max gap-2">
-            {["Total", ...kioskOptions].map((kioskId) => {
-              const isActive = kioskId === selectedKiosk;
-              const kioskVotes =
-                kioskId === "Total"
+            {["Total", ...boothOptions].map((boothId) => {
+              const isActive = boothId === selectedBooth;
+              const boothVotes =
+                boothId === "Total"
                   ? ballots.length
-                  : ballots.filter((ballot) => ballot.kioskId === kioskId)
+                  : ballots.filter((ballot) => ballot.boothId === boothId)
                       .length;
 
               return (
                 <button
-                  key={kioskId}
+                  key={boothId}
                   type="button"
-                  onClick={() => selectKiosk(kioskId)}
-                  aria-label={kioskId}
+                  onClick={() => selectBooth(boothId)}
+                  aria-label={boothId}
                   aria-pressed={isActive}
                   className={`min-h-11 rounded-lg px-4 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${
                     isActive
@@ -663,7 +717,7 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
                         : "text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                   }`}
                 >
-                  <span className="block whitespace-nowrap">{kioskId}</span>
+                  <span className="block whitespace-nowrap">{boothId}</span>
                   <span
                     className={`block text-xs font-medium ${
                       isActive
@@ -673,7 +727,7 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
                           : "text-slate-400"
                     }`}
                   >
-                    {kioskVotes} votes
+                    {boothVotes} votes
                   </span>
                 </button>
               );
@@ -729,7 +783,7 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
+        <section className="grid gap-6">
           <article className={`${glassClassName} p-5 sm:p-6`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
@@ -839,40 +893,6 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
             </div>
           </article>
 
-          <article
-            className={`${glassClassName} px-5 pb-3 pt-5 sm:px-6 sm:pb-4 sm:pt-6`}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p
-                  className={`text-xs font-semibold uppercase tracking-[0.18em] ${faintTextClassName}`}
-                >
-                  Vote Comparison
-                </p>
-                <h2
-                  className={`mt-2 font-display text-2xl font-semibold ${headingClassName}`}
-                >
-                  Horizontal Bar Chart
-                </h2>
-                <p className={`mt-1 text-sm ${mutedTextClassName}`}>
-                  Candidate vote distribution for the selected position.
-                </p>
-              </div>
-              <BarChart3 className="h-5 w-5 text-blue-600" aria-hidden="true" />
-            </div>
-
-            <div className="w-full h-[400px] min-h-[400px] mt-4">
-              {canUseResponsiveChart ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <CandidateVoteBarChart data={testData} isDark={isDark} />
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[400px] overflow-x-auto">
-                  <CandidateVoteBarChart data={testData} isDark={isDark} />
-                </div>
-              )}
-            </div>
-          </article>
         </section>
       </div>
     </main>

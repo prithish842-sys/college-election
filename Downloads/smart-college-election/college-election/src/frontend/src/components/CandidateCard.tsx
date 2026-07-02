@@ -8,6 +8,12 @@ interface CandidateCardProps {
   onSelect: (id: string) => void;
 }
 
+function getAvatarUrl(candidateName: string) {
+  const seed = encodeURIComponent(candidateName);
+
+  return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}&backgroundColor=dbeafe,bfdbfe,e0f2fe&fontWeight=700`;
+}
+
 export const CandidateCard = memo(function CandidateCard({
   candidate,
   isSelected,
@@ -16,135 +22,71 @@ export const CandidateCard = memo(function CandidateCard({
   const candidateId = candidate?.id ?? "";
   const candidateName = candidate?.name ?? "Candidate";
   const candidateDescription = candidate?.description ?? "";
-  const candidateImageUrl = candidate?.imageUrl ?? "/logo.png";
+  const avatarUrl = getAvatarUrl(candidateName);
 
   return (
-    <button
-      type="button"
+    <article
       data-ocid="candidate.card"
-      onClick={() => {
-        if (candidateId) onSelect(candidateId);
-      }}
-      aria-pressed={isSelected}
-      aria-label={`${isSelected ? "Selected: " : "Select "}${candidateName}`}
-      className="relative flex flex-col items-center text-center p-5 rounded-2xl cursor-pointer outline-none w-full"
+      className={`group relative flex h-full min-h-[254px] w-full min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border bg-white p-5 text-center transition duration-300 ease-in-out hover:bg-[#fdfdfd] ${
+        isSelected ? "border-blue-500" : "border-slate-200 hover:border-blue-200"
+      }`}
       style={{
-        background: isSelected
-          ? "linear-gradient(145deg, rgba(13,22,51,0.95) 0%, rgba(16,32,64,0.98) 100%)"
-          : "linear-gradient(145deg, rgba(13,22,51,0.7) 0%, rgba(10,14,26,0.85) 100%)",
-        backdropFilter: "blur(16px)",
-        WebkitBackdropFilter: "blur(16px)",
-        border: isSelected
-          ? "1.5px solid rgba(37,99,235,0.9)"
-          : "1px solid rgba(37,99,235,0.15)",
         boxShadow: isSelected
-          ? "0 0 28px rgba(37,99,235,0.4), 0 8px 32px rgba(0,0,0,0.5)"
-          : "0 4px 20px rgba(0,0,0,0.35)",
-        transform: "translateZ(0)",
-        transition: "all 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
+          ? "rgba(37, 99, 235, 0.25) 0px 6px 12px -2px, rgba(37, 99, 235, 0.3) 0px 3px 7px -3px"
+          : "rgba(50, 50, 93, 0.25) 0px 6px 12px -2px, rgba(0, 0, 0, 0.3) 0px 3px 7px -3px",
       }}
-      onMouseEnter={(e) => {
-        if (!isSelected) {
-          (e.currentTarget as HTMLButtonElement).style.transform =
-            "translateY(-6px) scale(1.02)";
-          (e.currentTarget as HTMLButtonElement).style.boxShadow =
-            "0 12px 40px rgba(0,0,0,0.55), 0 0 16px rgba(37,99,235,0.2)";
-          (e.currentTarget as HTMLButtonElement).style.borderColor =
-            "rgba(37,99,235,0.4)";
-        }
+      onMouseEnter={(event) => {
+        event.currentTarget.style.boxShadow =
+          "rgba(0, 0, 0, 0.09) 0px 2px 1px, rgba(0, 0, 0, 0.09) 0px 4px 2px, rgba(0, 0, 0, 0.09) 0px 8px 4px, rgba(0, 0, 0, 0.09) 0px 16px 8px, rgba(0, 0, 0, 0.09) 0px 32px 16px";
       }}
-      onMouseLeave={(e) => {
-        if (!isSelected) {
-          (e.currentTarget as HTMLButtonElement).style.transform =
-            "translateY(0) scale(1)";
-          (e.currentTarget as HTMLButtonElement).style.boxShadow =
-            "0 4px 20px rgba(0,0,0,0.35)";
-          (e.currentTarget as HTMLButtonElement).style.borderColor =
-            "rgba(37,99,235,0.15)";
-        }
+      onMouseLeave={(event) => {
+        event.currentTarget.style.boxShadow = isSelected
+          ? "rgba(37, 99, 235, 0.25) 0px 6px 12px -2px, rgba(37, 99, 235, 0.3) 0px 3px 7px -3px"
+          : "rgba(50, 50, 93, 0.25) 0px 6px 12px -2px, rgba(0, 0, 0, 0.3) 0px 3px 7px -3px";
       }}
     >
-      {/* Selected checkmark badge */}
       {isSelected && (
-        <div
-          className="absolute top-3 right-3 flex items-center justify-center w-6 h-6 rounded-full"
-          style={{
-            background: "linear-gradient(135deg, #1e4a8a 0%, #2563eb 100%)",
-            boxShadow: "0 0 12px rgba(37,99,235,0.6)",
-          }}
-        >
-          <Check size={13} strokeWidth={3} style={{ color: "#fff" }} />
+        <div className="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/25">
+          <Check size={15} strokeWidth={3} aria-hidden="true" />
         </div>
       )}
 
-      {/* Avatar */}
-      <div
-        className="relative mb-4"
-        style={{
-          width: 80,
-          height: 80,
-          borderRadius: "50%",
-          padding: 3,
-          background: isSelected
-            ? "linear-gradient(135deg, #1e4a8a, #2563eb, #60a5fa)"
-            : "linear-gradient(135deg, rgba(37,99,235,0.3), rgba(96,165,250,0.2))",
-          transition: "all 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
-        }}
-      >
+      <div className="mx-auto mt-1 flex h-[clamp(5rem,10vh,7rem)] w-[clamp(5rem,10vh,7rem)] shrink-0 items-center justify-center rounded-full bg-blue-50 p-1.5">
         <img
-          src={candidateImageUrl}
+          src={avatarUrl}
           alt=""
-          width={74}
-          height={74}
-          className="rounded-full object-cover"
-          style={{
-            background: "rgba(10,14,26,0.8)",
-            display: "block",
-          }}
+          width={112}
+          height={112}
+          className="h-full w-full rounded-full object-cover"
+          draggable={false}
         />
       </div>
 
-      {/* Name */}
-      <h3
-        className="font-display font-bold text-foreground mb-1 leading-tight"
-        style={{
-          fontFamily: "Space Grotesk, sans-serif",
-          fontSize: "1rem",
-          letterSpacing: "-0.01em",
-        }}
-      >
-        {candidateName}
-      </h3>
+      <div className="mt-4 min-h-0 flex-1">
+        <h3 className="line-clamp-2 font-display text-[clamp(1rem,1.25vw,1.2rem)] font-bold leading-tight text-slate-950">
+          {candidateName}
+        </h3>
+        <p className="mx-auto mt-2 line-clamp-3 max-w-[16rem] text-[clamp(0.78rem,0.9vw,0.9rem)] leading-5 text-slate-500">
+          {candidateDescription}
+        </p>
+      </div>
 
-      {/* Description */}
-      <p
-        className="text-muted-foreground text-xs leading-relaxed mb-4 flex-1"
-        style={{ lineHeight: 1.6 }}
-      >
-        {candidateDescription.slice(0, 90)}
-        {candidateDescription.length > 90 ? "..." : ""}
-      </p>
-
-      {/* Select indicator */}
-      <div
+      <button
+        type="button"
         data-ocid="candidate.select_button"
-        className="w-full py-2 rounded-xl text-xs font-bold tracking-widest"
-        style={{
-          fontFamily: "Space Grotesk, sans-serif",
-          background: isSelected
-            ? "linear-gradient(135deg, #1e4a8a 0%, #2563eb 100%)"
-            : "linear-gradient(135deg, rgba(37,99,235,0.15) 0%, rgba(30,74,138,0.25) 100%)",
-          border: isSelected
-            ? "1px solid rgba(96,165,250,0.6)"
-            : "1px solid rgba(37,99,235,0.3)",
-          color: isSelected ? "#fff" : "#93c5fd",
-          boxShadow: isSelected ? "0 0 16px rgba(37,99,235,0.4)" : "none",
-          transition: "all 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
-          letterSpacing: "0.12em",
+        onClick={() => {
+          if (candidateId) onSelect(candidateId);
         }}
+        aria-pressed={isSelected}
+        aria-label={`${isSelected ? "Selected: " : "Select "}${candidateName}`}
+        className={`mt-4 min-h-11 w-full rounded-xl px-4 text-sm font-bold tracking-wide text-white shadow-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+          isSelected
+            ? "bg-blue-700 shadow-blue-700/25"
+            : "bg-blue-600 shadow-blue-600/25 hover:bg-blue-700"
+        }`}
       >
         {isSelected ? "Voted" : "Vote"}
-      </div>
-    </button>
+      </button>
+    </article>
   );
 });

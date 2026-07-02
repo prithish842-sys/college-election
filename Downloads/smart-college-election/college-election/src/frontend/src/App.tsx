@@ -1,4 +1,4 @@
-import { KioskPortal } from "@/components/KioskPortal";
+import { BoothPortal } from "@/components/BoothPortal";
 import { MobilePortal } from "@/components/MobilePortal";
 import { ResultsGuard } from "@/components/ResultsGuard";
 import { Analytics } from "@vercel/analytics/react";
@@ -23,16 +23,16 @@ const mobileRoute = createRoute({
   component: MobilePortal,
 });
 
-function KioskRoutePortal() {
-  const { kioskId } = useParams({ strict: false }) as { kioskId?: string };
+function BoothRoutePortal() {
+  const { boothId } = useParams({ strict: false }) as { boothId?: string };
 
-  return <KioskPortal kioskId={kioskId} />;
+  return <BoothPortal boothId={boothId} />;
 }
 
-const kioskRoute = createRoute({
+const boothRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/kiosk/$kioskId",
-  component: KioskRoutePortal,
+  path: "/booth/$boothId",
+  component: BoothRoutePortal,
 });
 
 const resultsRoute = createRoute({
@@ -43,7 +43,7 @@ const resultsRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   mobileRoute,
-  kioskRoute,
+  boothRoute,
   resultsRoute,
 ]);
 

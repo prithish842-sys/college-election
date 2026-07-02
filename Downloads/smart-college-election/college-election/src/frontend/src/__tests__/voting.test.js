@@ -150,8 +150,8 @@ describe("voting transaction helpers", () => {
     expect(transaction.update).not.toHaveBeenCalled();
   });
 
-  it("submits a kiosk ballot in a transaction and updates aggregate counters", async () => {
-    const { submitKioskBallot } = await import("../lib/voting");
+  it("submits a booth ballot in a transaction and updates aggregate counters", async () => {
+    const { submitBoothBallot } = await import("../lib/voting");
     const votes = createValidVotes();
 
     const transaction = {
@@ -164,7 +164,7 @@ describe("voting transaction helpers", () => {
       callback(transaction),
     );
 
-    await submitKioskBallot(votes);
+    await submitBoothBallot(votes, "booth1");
 
     expect(collectionMock).toHaveBeenCalledWith({ name: "mock-db" }, "ballots");
     expect(transaction.update).not.toHaveBeenCalled();
@@ -177,7 +177,7 @@ describe("voting transaction helpers", () => {
     expect(ballotWrite[1]).toEqual(
       expect.objectContaining({
         votes,
-        source: "kiosk",
+        source: "booth",
         submitted_at: { __type: "serverTimestamp" },
       }),
     );
@@ -201,3 +201,4 @@ describe("voting transaction helpers", () => {
     expect(runTransactionMock).not.toHaveBeenCalled();
   });
 });
+

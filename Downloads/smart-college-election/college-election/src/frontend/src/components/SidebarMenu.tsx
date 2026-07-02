@@ -62,10 +62,9 @@ export const SidebarMenu = memo(function SidebarMenu({
           zIndex: 101,
           display: "flex",
           flexDirection: "column",
-          background:
-            "linear-gradient(180deg, #0a0e1a 0%, #0d1633 50%, #0a0e1a 100%)",
-          borderRight: "1px solid rgba(37,99,235,0.3)",
-          boxShadow: "8px 0 48px rgba(0,0,0,0.6)",
+          background: "#FFFFFF",
+          borderRight: "1px solid rgba(226,232,240,0.95)",
+          boxShadow: "12px 0 32px rgba(15,23,42,0.08)",
           transform: persistent
             ? "translateX(0)"
             : isOpen
@@ -78,14 +77,14 @@ export const SidebarMenu = memo(function SidebarMenu({
         <div
           className="flex items-center justify-between px-5 py-4"
           style={{
-            borderBottom: "1px solid rgba(37,99,235,0.2)",
+            borderBottom: "1px solid rgba(226,232,240,0.95)",
           }}
         >
           <div className="flex items-center gap-3 min-w-0">
             <LogoMark size={56} variant="plain" />
             <div className="min-w-0">
               <p
-                className="font-bold text-foreground"
+                className="font-bold text-slate-950"
                 style={{
                   fontFamily: "Space Grotesk, sans-serif",
                   fontSize: "1rem",
@@ -94,7 +93,7 @@ export const SidebarMenu = memo(function SidebarMenu({
               >
                 Election Positions
               </p>
-              <p className="text-muted-foreground text-xs mt-0.5">
+              <p className="mt-0.5 text-xs text-slate-500">
                 {votedCount} of {positions.length} voted
               </p>
             </div>
@@ -108,8 +107,8 @@ export const SidebarMenu = memo(function SidebarMenu({
               className="flex items-center justify-center w-8 h-8 rounded-lg"
               style={{
                 background: "rgba(37,99,235,0.12)",
-                border: "1px solid rgba(37,99,235,0.25)",
-                color: "#93c5fd",
+                border: "1px solid rgba(37,99,235,0.2)",
+                color: "#2563eb",
                 transition: "all 0.3s ease",
               }}
             >
@@ -135,10 +134,10 @@ export const SidebarMenu = memo(function SidebarMenu({
                 className="w-full flex items-center gap-3 px-3 py-3 rounded-xl mb-1 text-left"
                 style={{
                   background: isActive
-                    ? "linear-gradient(135deg, rgba(37,99,235,0.25) 0%, rgba(30,74,138,0.35) 100%)"
+                    ? "rgba(37,99,235,0.1)"
                     : "transparent",
                   border: isActive
-                    ? "1px solid rgba(37,99,235,0.5)"
+                    ? "1px solid rgba(37,99,235,0.22)"
                     : "1px solid transparent",
                   opacity: isLocked ? 0.45 : 1,
                   cursor: isLocked ? "not-allowed" : "pointer",
@@ -150,7 +149,7 @@ export const SidebarMenu = memo(function SidebarMenu({
                   className="flex-1 min-w-0 font-medium text-sm truncate"
                   style={{
                     fontFamily: "Space Grotesk, sans-serif",
-                    color: isActive ? "#93c5fd" : "rgba(226,232,240,0.8)",
+                    color: isActive ? "#1d4ed8" : "#475569",
                   }}
                 >
                   {position.title}

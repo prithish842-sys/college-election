@@ -1,24 +1,24 @@
 import { memo } from "react";
-import { KioskVotingDashboard } from "./KioskVotingDashboard";
+import { BoothVotingDashboard } from "./BoothVotingDashboard";
 
 interface SharedVotingUIProps {
-  mode: "kiosk" | "mobile";
+  mode: "booth" | "mobile";
   onSessionComplete: () => void;
   studentId?: string;
-  kioskId?: string;
+  boothId?: string;
 }
 
 export const SharedVotingUI = memo(function SharedVotingUI({
   mode,
   onSessionComplete,
   studentId,
-  kioskId,
+  boothId,
 }: SharedVotingUIProps) {
   return (
-    <KioskVotingDashboard
+    <BoothVotingDashboard
       mode={mode}
       studentId={studentId}
-      kioskId={kioskId}
+      boothId={boothId}
       onSessionComplete={onSessionComplete}
     />
   );
