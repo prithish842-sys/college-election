@@ -28,6 +28,12 @@ import { CountUp } from "./CountUp";
 
 interface BallotRecord {
   votes?: Vote;
+  kioskId?: string;
+}
+
+interface CountedBallotRecord {
+  votes: Vote;
+  kioskId?: string;
 }
 
 interface CandidateDetails {
@@ -118,12 +124,19 @@ function getVoteSignature(vote: Vote | undefined) {
   return POSITIONS.map((position) => vote?.[position.id] ?? "").join("|");
 }
 
-function areBallotsEqual(currentBallots: Vote[], nextBallots: Vote[]) {
+function getBallotSignature(ballot: CountedBallotRecord) {
+  return `${ballot.kioskId ?? ""}:${getVoteSignature(ballot.votes)}`;
+}
+
+function areBallotsEqual(
+  currentBallots: CountedBallotRecord[],
+  nextBallots: CountedBallotRecord[],
+) {
   return (
     currentBallots.length === nextBallots.length &&
     currentBallots.every(
       (ballot, index) =>
-        getVoteSignature(ballot) === getVoteSignature(nextBallots[index]),
+        getBallotSignature(ballot) === getBallotSignature(nextBallots[index]),
     )
   );
 }
@@ -190,7 +203,8 @@ function CandidateVoteBarChart({
 }
 
 export const ResultsDashboard = memo(function ResultsDashboard() {
-  const [ballots, setBallots] = useState<Vote[]>([]);
+  const [ballots, setBallots] = useState<CountedBallotRecord[]>([]);
+  const [selectedKiosk, setSelectedKiosk] = useState("Total");
   const [selectedPositionId, setSelectedPositionId] = useState(POSITIONS[0].id);
   const [isDark, setIsDark] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -204,13 +218,26 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
         (snapshot) => {
           const nextBallots =
             snapshot?.docs
-              ?.map((ballotDocument) => {
+              ?.flatMap((ballotDocument) => {
                 const ballot = ballotDocument.data?.() as
                   | BallotRecord
                   | undefined;
-                return ballot?.votes;
-              })
-              .filter((votes): votes is Vote => Boolean(votes)) ?? [];
+
+                if (!ballot?.votes) {
+                  return [];
+                }
+
+                const countedBallot: CountedBallotRecord = {
+                  votes: ballot.votes,
+                };
+                const kioskId = ballot.kioskId?.trim();
+
+                if (kioskId) {
+                  countedBallot.kioskId = kioskId;
+                }
+
+                return [countedBallot];
+              }) ?? [];
 
           setBallots((currentBallots) =>
             areBallotsEqual(currentBallots, nextBallots)
@@ -234,19 +261,50 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
     };
   }, []);
 
-  const totalVotes = ballots.length;
+  const kioskOptions = useMemo(() => {
+    const collator = new Intl.Collator(undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+
+    return Array.from(
+      new Set(
+        ballots
+          .map((ballot) => ballot.kioskId)
+          .filter((kioskId): kioskId is string => Boolean(kioskId)),
+      ),
+    ).sort(collator.compare);
+  }, [ballots]);
+
+  useEffect(() => {
+    if (selectedKiosk !== "Total" && !kioskOptions.includes(selectedKiosk)) {
+      setSelectedKiosk("Total");
+    }
+  }, [kioskOptions, selectedKiosk]);
+
+  const filteredVotes = useMemo(() => {
+    if (selectedKiosk === "Total") {
+      return ballots.map((ballot) => ballot.votes);
+    }
+
+    return ballots
+      .filter((ballot) => ballot.kioskId === selectedKiosk)
+      .map((ballot) => ballot.votes);
+  }, [ballots, selectedKiosk]);
+
+  const totalVotes = filteredVotes.length;
 
   const candidateTotals = useMemo(() => {
     const totals = new Map<string, number>();
 
-    for (const ballot of ballots) {
+    for (const ballot of filteredVotes) {
       for (const candidateId of Object.values(ballot)) {
         totals.set(candidateId, (totals.get(candidateId) ?? 0) + 1);
       }
     }
 
     return totals;
-  }, [ballots]);
+  }, [filteredVotes]);
 
   const selectedPosition = useMemo(
     () =>
@@ -257,6 +315,10 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
 
   const selectPosition = useCallback((positionId: string) => {
     setSelectedPositionId(positionId);
+  }, []);
+
+  const selectKiosk = useCallback((kioskId: string) => {
+    setSelectedKiosk(kioskId);
   }, []);
 
   const standingCandidates = useMemo<StandingCandidate[]>(() => {
@@ -572,6 +634,52 @@ export const ResultsDashboard = memo(function ResultsDashboard() {
             {loadError}
           </p>
         )}
+
+        <section
+          aria-label="Election kiosks"
+          className={`${subtleGlassClassName} overflow-x-auto p-2`}
+        >
+          <div className="flex min-w-max gap-2">
+            {["Total", ...kioskOptions].map((kioskId) => {
+              const isActive = kioskId === selectedKiosk;
+              const kioskVotes =
+                kioskId === "Total"
+                  ? ballots.length
+                  : ballots.filter((ballot) => ballot.kioskId === kioskId)
+                      .length;
+
+              return (
+                <button
+                  key={kioskId}
+                  type="button"
+                  onClick={() => selectKiosk(kioskId)}
+                  aria-label={kioskId}
+                  aria-pressed={isActive}
+                  className={`min-h-11 rounded-lg px-4 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${
+                    isActive
+                      ? "bg-slate-800 text-white shadow-sm"
+                      : isDark
+                        ? "text-slate-400 hover:bg-white/10 hover:text-slate-100"
+                        : "text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  }`}
+                >
+                  <span className="block whitespace-nowrap">{kioskId}</span>
+                  <span
+                    className={`block text-xs font-medium ${
+                      isActive
+                        ? "text-slate-300"
+                        : isDark
+                          ? "text-slate-500"
+                          : "text-slate-400"
+                    }`}
+                  >
+                    {kioskVotes} votes
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
         <section
           aria-label="Election positions"

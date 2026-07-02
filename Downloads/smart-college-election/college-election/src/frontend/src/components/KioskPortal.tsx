@@ -1,7 +1,13 @@
 import { memo, useCallback, useState } from "react";
 import { SharedVotingUI } from "./SharedVotingUI";
 
-export const KioskPortal = memo(function KioskPortal() {
+interface KioskPortalProps {
+  kioskId?: string;
+}
+
+export const KioskPortal = memo(function KioskPortal({
+  kioskId,
+}: KioskPortalProps) {
   const [sessionKey, setSessionKey] = useState(0);
 
   const startNextSession = useCallback(() => {
@@ -13,6 +19,7 @@ export const KioskPortal = memo(function KioskPortal() {
     <SharedVotingUI
       key={sessionKey}
       mode="kiosk"
+      kioskId={kioskId}
       onSessionComplete={startNextSession}
     />
   );

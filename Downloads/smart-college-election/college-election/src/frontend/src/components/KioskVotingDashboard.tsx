@@ -20,6 +20,7 @@ import { VotingView } from "./VotingView";
 
 interface KioskVotingDashboardProps {
   studentId?: string;
+  kioskId?: string;
   onSessionComplete: () => void;
   mode?: "kiosk" | "mobile";
 }
@@ -58,11 +59,21 @@ function isBrowserOffline() {
   return typeof navigator !== "undefined" && navigator.onLine === false;
 }
 
+function getValidatedKioskId(kioskId: string | undefined) {
+  const normalizedKioskId = kioskId?.trim();
+
+  if (!normalizedKioskId) {
+    throw new Error("Kiosk ID is missing from the voting URL.");
+  }
+
+  return normalizedKioskId;
+}
+
 function shouldTreatAsQueuedWrite(error: unknown, writeStarted = true) {
   return isNetworkRelatedError(error) || (writeStarted && isBrowserOffline());
 }
 
-function queueKioskBallot(votes: Vote) {
+function queueKioskBallot(votes: Vote, kioskId: string | undefined) {
   const hasEveryVote = POSITIONS.every((position) => {
     const candidateId = votes[position.id];
     return CANDIDATES.some(
@@ -75,11 +86,13 @@ function queueKioskBallot(votes: Vote) {
     throw new Error("Please vote for every position before submitting.");
   }
 
+  const validatedKioskId = getValidatedKioskId(kioskId);
   const ballotReference = doc(collection(db, BALLOTS_COLLECTION));
   const batch = writeBatch(db);
 
   batch.set(ballotReference, {
     votes,
+    kioskId: validatedKioskId,
     source: "kiosk",
     submitted_at: serverTimestamp(),
   });
@@ -114,6 +127,7 @@ function queueKioskBallot(votes: Vote) {
 
 export const KioskVotingDashboard = memo(function KioskVotingDashboard({
   studentId,
+  kioskId,
   onSessionComplete,
   mode = "kiosk",
 }: KioskVotingDashboardProps) {
@@ -244,7 +258,10 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
 
     try {
       if (mode === "kiosk") {
-        const { ballotReference, commitPromise } = queueKioskBallot(votes);
+        const { ballotReference, commitPromise } = queueKioskBallot(
+          votes,
+          kioskId,
+        );
         writeStarted = true;
 
         // The atomic batch is now in Firestore's local mutation queue. Its
@@ -314,7 +331,7 @@ export const KioskVotingDashboard = memo(function KioskVotingDashboard({
       });
       throw writeError;
     }
-  }, [mode, studentId, votes]);
+  }, [kioskId, mode, studentId, votes]);
 
   if (view === "success") {
     return <VoteSuccessScreen mode={mode} onReset={onSessionComplete} />;

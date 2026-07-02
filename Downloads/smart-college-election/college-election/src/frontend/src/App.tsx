@@ -8,6 +8,7 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  useParams,
 } from "@tanstack/react-router";
 
 function RootLayout() {
@@ -22,10 +23,16 @@ const mobileRoute = createRoute({
   component: MobilePortal,
 });
 
+function KioskRoutePortal() {
+  const { kioskId } = useParams({ strict: false }) as { kioskId?: string };
+
+  return <KioskPortal kioskId={kioskId} />;
+}
+
 const kioskRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/kiosk",
-  component: KioskPortal,
+  path: "/kiosk/$kioskId",
+  component: KioskRoutePortal,
 });
 
 const resultsRoute = createRoute({
